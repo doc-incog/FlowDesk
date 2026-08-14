@@ -36,7 +36,7 @@ export function NotificationsSection() {
         action={
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"
+            className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"
           >
             <Check className="h-4 w-4" aria-hidden /> Mark all read
           </button>
@@ -49,7 +49,7 @@ export function NotificationsSection() {
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-full px-3 py-1.5 text-sm font-medium capitalize transition-colors",
+              "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
             )}
           >
@@ -69,7 +69,7 @@ export function NotificationsSection() {
                 n.unread ? "border-primary/30 bg-primary/[0.03]" : "",
               )}
             >
-              <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", meta.className)}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
                 <meta.icon className="h-5 w-5" aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
@@ -83,7 +83,7 @@ export function NotificationsSection() {
               {n.unread && (
                 <button
                   onClick={() => toggle(n.id)}
-                  className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="shrink-0 rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   aria-label="Mark as read"
                 >
                   <Check className="h-4 w-4" aria-hidden />

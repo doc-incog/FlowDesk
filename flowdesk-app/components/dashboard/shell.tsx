@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import {
   Building2,
   LayoutDashboard,
-  Fingerprint,
   Bell,
   GraduationCap,
   Users,
@@ -26,6 +25,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { NOTIFICATIONS, ROLE_META, type Role } from "@/lib/mock-data"
 import { Avatar, RoleBadge } from "@/components/dashboard/primitives"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
 import { AIChat } from "@/components/ai-chat"
 
@@ -68,7 +68,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, roles: ["student", "staff", "admin"] },
-  { id: "checkin", label: "Check-in", icon: Fingerprint, roles: ["student", "staff", "admin"] },
+  { id: "checkin", label: "Check-in", icon: LayoutDashboard, roles: ["student", "staff", "admin"] },
   { id: "notifications", label: "Notifications", icon: Bell, roles: ["student", "staff", "admin"] },
   { id: "students", label: "Students", icon: GraduationCap, roles: ["staff", "admin"] },
   { id: "staff", label: "Staff", icon: Users, roles: ["admin"] },
@@ -97,8 +97,10 @@ export function DashboardShell() {
 
   if (!ready || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        <Fingerprint className="h-6 w-6 animate-pulse" aria-hidden />
+      <div className="ambient flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        <span className="glass flex h-10 w-10 items-center justify-center rounded-xl">
+          <Building2 className="h-5 w-5 animate-pulse text-primary" aria-hidden />
+        </span>
       </div>
     )
   }
@@ -148,11 +150,11 @@ export function DashboardShell() {
 
   const SidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <div className="flex items-center gap-3 px-5 py-6">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
           <Building2 className="h-5 w-5" aria-hidden />
         </div>
-        <span className="text-base font-bold tracking-tight text-sidebar-foreground">FlowDesk</span>
+        <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">FlowDesk</span>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Dashboard sections">
@@ -170,14 +172,17 @@ export function DashboardShell() {
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  ? "bg-primary/10 text-primary"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
-              <item.icon className="h-4.5 w-4.5 shrink-0" aria-hidden />
+              <item.icon
+                className={cn("h-4.5 w-4.5 shrink-0", isActive ? "text-primary" : "text-sidebar-foreground/60")}
+                aria-hidden
+              />
               <span className="flex-1 text-left">{label}</span>
               {item.id === "notifications" && unread > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
                   {unread}
                 </span>
               )}
@@ -188,15 +193,15 @@ export function DashboardShell() {
 
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <Avatar initials={user.avatarInitials} className="bg-sidebar-accent text-sidebar-accent-foreground" />
+          <Avatar initials={user.avatarInitials} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-sidebar-foreground">{user.name}</p>
-            <p className="truncate font-mono text-xs text-sidebar-foreground/60">{user.id}</p>
+            <p className="truncate font-mono text-xs text-sidebar-foreground/50">{user.id}</p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <LogOut className="h-4.5 w-4.5" aria-hidden />
           Sign out
@@ -206,15 +211,17 @@ export function DashboardShell() {
   )
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="ambient flex min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">{SidebarContent}</aside>
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 px-3 py-3 lg:block">
+        <div className="glass-strong h-full overflow-hidden rounded-2xl bg-sidebar/70">{SidebarContent}</div>
+      </aside>
 
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
@@ -233,7 +240,7 @@ export function DashboardShell() {
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-background/70 px-4 py-3 backdrop-blur lg:top-3 lg:mx-3 lg:rounded-2xl lg:border lg:bg-background/50 lg:shadow-sm">
           <button
             onClick={() => setMobileOpen(true)}
             className="rounded-lg p-2 text-muted-foreground hover:bg-secondary lg:hidden"
@@ -242,8 +249,8 @@ export function DashboardShell() {
             <Menu className="h-5 w-5" aria-hidden />
           </button>
 
-          <div className="hidden items-center gap-2 sm:flex">
-            <span className="text-sm font-semibold">{ROLE_META[user.role].label} workspace</span>
+          <div className="hidden items-center gap-2.5 sm:flex">
+            <span className="text-sm font-medium">{ROLE_META[user.role].label} workspace</span>
             <RoleBadge role={user.role} />
           </div>
 
@@ -252,25 +259,27 @@ export function DashboardShell() {
             <input
               type="search"
               placeholder="Search people, modules…"
-              className="w-full rounded-lg border border-input bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+              className="w-full rounded-lg border border-input bg-card/70 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
             />
           </div>
 
-          <button
-            onClick={() => setActive("notifications")}
-            className="relative ml-auto rounded-lg p-2 text-muted-foreground hover:bg-secondary md:ml-0"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" aria-hidden />
-            {unread > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" aria-hidden />
-            )}
-          </button>
-
-          <Avatar initials={user.avatarInitials} className="h-9 w-9" />
+          <div className="ml-auto flex items-center gap-2 md:ml-3">
+            <ThemeToggle />
+            <button
+              onClick={() => setActive("notifications")}
+              className="relative rounded-lg p-2 text-muted-foreground hover:bg-secondary"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" aria-hidden />
+              {unread > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" aria-hidden />
+              )}
+            </button>
+            <Avatar initials={user.avatarInitials} className="h-9 w-9" />
+          </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
+        <main className="flex-1 px-4 py-6 lg:px-6 lg:py-8">
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>

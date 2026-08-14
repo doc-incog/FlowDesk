@@ -21,9 +21,9 @@ import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
 const TYPE_BADGE: Record<ExamType, string> = {
-  midterm: "bg-chart-1/10 text-chart-1",
-  final: "bg-chart-5/10 text-chart-5",
-  practical: "bg-chart-2/15 text-chart-2",
+  midterm: "pill bg-chart-1/10 text-chart-1",
+  final: "pill bg-chart-5/10 text-chart-5",
+  practical: "pill bg-chart-2/15 text-chart-2",
 }
 
 const TYPE_LABEL: Record<ExamType, string> = {
@@ -88,7 +88,7 @@ function ExamSchedule({ exams }: { exams: Exam[] }) {
               <p className="truncate font-semibold">{ex.moduleName}</p>
               <p className="font-mono text-xs text-muted-foreground">{ex.moduleCode}</p>
             </div>
-            <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", TYPE_BADGE[ex.type])}>
+            <span className={cn("shrink-0", TYPE_BADGE[ex.type])}>
               {TYPE_LABEL[ex.type]}
             </span>
           </div>
@@ -127,8 +127,8 @@ function SeatingView({ exams }: { exams: Exam[] }) {
               key={ex.id}
               onClick={() => setExamId(ex.id)}
               className={cn(
-                "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                examId === ex.id ? "border-primary bg-primary/5" : "border-border hover:bg-secondary",
+                "flex w-full items-center justify-between rounded-sm border px-3 py-2 text-left text-sm transition-colors",
+                examId === ex.id ? "border-primary bg-primary/[0.04]" : "border-border hover:bg-secondary",
               )}
             >
               <span className="font-medium">{ex.moduleCode}</span>
@@ -146,7 +146,7 @@ function SeatingView({ exams }: { exams: Exam[] }) {
                 <p className="font-semibold">{exam.moduleName} — {exam.title}</p>
                 <p className="text-sm text-muted-foreground">{exam.date} · {exam.room} · {exam.start}–{exam.end}</p>
               </div>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
+              <span className="pill bg-primary/10 text-primary">
                 Your seat: {mySeat}
               </span>
             </div>
@@ -162,9 +162,9 @@ function SeatingView({ exams }: { exams: Exam[] }) {
                     <div
                       key={s.id}
                       className={cn(
-                        "flex flex-col items-center justify-center rounded-xl border p-3 text-center",
+                        "flex flex-col items-center justify-center rounded-md border p-3 text-center",
                         mine
-                          ? "border-primary bg-primary/10 text-primary"
+                          ? "border-primary bg-primary/[0.04] text-primary"
                           : "border-border bg-secondary/50 text-muted-foreground",
                       )}
                     >
@@ -284,7 +284,7 @@ function ReportCardView({ student, exams, results }: { student: UserProfile; exa
                 <td className="py-2.5 text-right font-semibold">{r.marks}</td>
                 <td className="py-2.5 text-right text-muted-foreground">{r.pct}%</td>
                 <td className="py-2.5 text-right">
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{r.grade}</span>
+                  <span className="pill bg-primary/10 text-primary">{r.grade}</span>
                 </td>
               </tr>
             ))}
@@ -307,7 +307,7 @@ function ReportCardView({ student, exams, results }: { student: UserProfile; exa
             <div key={r.exam.id} className="flex flex-1 flex-col items-center gap-2">
               <span className="font-mono text-xs font-semibold text-primary">{r.pct}%</span>
               <div
-                className={cn("w-full max-w-12 rounded-t-lg", r.pct >= 60 ? "bg-primary" : "bg-warning")}
+                className={cn("w-full max-w-12 rounded-t-sm", r.pct >= 60 ? "bg-primary" : "bg-warning")}
                 style={{ height: `${Math.max(8, r.pct)}%` }}
               />
               <span className="font-mono text-[10px] text-muted-foreground">{r.exam.moduleCode}</span>
@@ -330,7 +330,7 @@ function AllResults({ exams, results }: { exams: Exam[]; results: ResultRow[] })
         <select
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+          className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
         >
           {STUDENTS.map((s) => (
             <option key={s.id} value={s.id}>
@@ -389,7 +389,7 @@ function MarkEntry({
         <select
           value={examId}
           onChange={(e) => selectExam(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+          className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
         >
           {exams.map((e) => (
             <option key={e.id} value={e.id}>
@@ -425,11 +425,11 @@ function MarkEntry({
                       max={exam?.maxMarks ?? 0}
                       value={marks[s.id] ?? ""}
                       onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: Number(e.target.value) }))}
-                      className="w-24 rounded-lg border border-input bg-card px-2 py-1.5 text-right font-mono text-sm outline-none focus:border-primary"
+                      className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 text-right font-mono text-sm outline-none focus:border-primary"
                     />
                   </td>
                   <td className="py-2.5 text-right">
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{gradeFor(pct)}</span>
+                    <span className="pill bg-primary/10 text-primary">{gradeFor(pct)}</span>
                   </td>
                 </tr>
               )
@@ -496,7 +496,7 @@ function ManageExams({
   }
 
   const inputCls =
-    "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+    "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -589,7 +589,7 @@ function ManageExams({
               </div>
               <button
                 onClick={() => setExams((prev) => prev.filter((e) => e.id !== ex.id))}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="rounded-sm p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label={`Delete ${ex.moduleCode}`}
               >
                 <Trash2 className="h-4 w-4" aria-hidden />

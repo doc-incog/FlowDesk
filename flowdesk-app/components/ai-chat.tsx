@@ -52,13 +52,13 @@ export function AIChat() {
   return (
     <>
       {open && (
-        <div className="fixed bottom-24 right-4 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
-          <div className="flex items-center gap-2.5 border-b border-border bg-secondary px-4 py-3">
+        <div className="glass-strong fixed bottom-24 right-4 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl">
+          <div className="flex items-center gap-2.5 border-b border-border bg-secondary/40 px-4 py-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Bot className="h-4.5 w-4.5" aria-hidden />
             </span>
             <div className="flex-1">
-              <p className="text-sm font-bold">Flow Assistant</p>
+              <p className="text-sm font-semibold">Flow Assistant</p>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden /> Online · campus knowledge base
               </p>
@@ -66,7 +66,7 @@ export function AIChat() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Close chat"
-              className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted"
+              className="rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-muted"
             >
               <X className="h-5 w-5" aria-hidden />
             </button>
@@ -80,7 +80,7 @@ export function AIChat() {
                     "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                     m.from === "user"
                       ? "rounded-br-md bg-primary text-primary-foreground"
-                      : "rounded-bl-md bg-secondary text-secondary-foreground",
+                      : "rounded-bl-md border border-border bg-secondary/60 text-secondary-foreground",
                   )}
                 >
                   {m.text}
@@ -89,7 +89,7 @@ export function AIChat() {
             ))}
             {typing && (
               <div className="flex">
-                <div className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5">
+                <div className="rounded-md rounded-bl-sm border border-border bg-secondary/60 px-4 py-2.5">
                   <span className="flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <span
@@ -111,7 +111,7 @@ export function AIChat() {
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                  className="rounded-full border border-border bg-card/60 px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                 >
                   {s}
                 </button>
@@ -128,7 +128,7 @@ export function AIChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about the campus…"
-                className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                className="w-full rounded-lg border border-input bg-card/70 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
               />
               <button
                 type="submit"

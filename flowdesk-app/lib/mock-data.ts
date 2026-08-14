@@ -59,6 +59,11 @@ export type Mentor = {
   mentees: number
 }
 
+export const ADMIN_CREDS = {
+  email: "admin@flowdesk.edu",
+  password: "flowdesk-admin@2026",
+}
+
 export const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {
   student: {
     label: "Student",

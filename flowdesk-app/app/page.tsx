@@ -1,216 +1,157 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { GraduationCap, Users, ShieldCheck, ArrowRight, Fingerprint, Building2 } from "lucide-react"
+import { ArrowRight, Building2, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { ROLE_META, type Role } from "@/lib/mock-data"
-import { BiometricScanner } from "@/components/biometric-scanner"
-import { cn } from "@/lib/utils"
-
-const ROLE_ORDER: Role[] = ["student", "staff", "admin"]
-
-const ROLE_ICON: Record<Role, typeof GraduationCap> = {
-  student: GraduationCap,
-  staff: Users,
-  admin: ShieldCheck,
-}
-
-const DEMO_ID: Record<Role, string> = {
-  student: "aisha.karim@campus.edu",
-  staff: "rahul.menon@campus.edu",
-  admin: "priya.sharma@campus.edu",
-}
+import { ADMIN_CREDS } from "@/lib/mock-data"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function LoginPage() {
   const router = useRouter()
   const { user, ready, login } = useAuth()
-  const [role, setRole] = useState<Role>("student")
-  const [mode, setMode] = useState<"password" | "biometric">("password")
+  const [email, setEmail] = useState("aisha.karim@campus.edu")
+  const [password, setPassword] = useState("campus123")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (ready && user) router.replace("/dashboard")
   }, [ready, user, router])
 
-  const handleLogin = () => {
-    login(role)
+  const handleLogin = (e: FormEvent) => {
+    e.preventDefault()
+    const profile = login(email, password)
+    if (!profile) {
+      setError("Invalid credentials. Use a registered campus email, or the admin credentials shown below.")
+      return
+    }
     router.push("/dashboard")
   }
 
-  const Icon = ROLE_ICON[role]
-
   return (
-    <main className="flex min-h-screen flex-col lg:flex-row">
+    <main className="ambient flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 lg:flex-row lg:gap-14 lg:px-14">
       {/* Brand panel */}
-      <section className="relative flex flex-col justify-between overflow-hidden border-b border-border bg-card px-8 py-10 lg:w-[44%] lg:border-b-0 lg:border-r lg:px-14 lg:py-14">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="h-5 w-5" aria-hidden />
+      <section className="relative z-10 w-full max-w-md pb-10 lg:pb-0">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Building2 className="h-5.5 w-5.5" aria-hidden />
           </div>
-          <span className="text-lg font-bold tracking-tight">FlowDesk</span>
+          <span className="text-2xl font-semibold tracking-tight">FlowDesk</span>
         </div>
 
-        <div className="relative z-10 my-12 max-w-md">
-          <h1 className="text-balance text-3xl font-bold leading-tight tracking-tight lg:text-4xl">
-            One platform for your entire campus.
-          </h1>
-          <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
-            Biometric check-in, notifications, mentor guidance and module routines — unified for students, staff and
-            administrators.
-          </p>
-
-          <ul className="mt-8 space-y-3">
-            {[
-              { icon: Fingerprint, text: "Fingerprint & WebAuthn secured access" },
-              { icon: Users, text: "Role-aware dashboards for every member" },
-              { icon: ShieldCheck, text: "Real-time attendance and alerts" },
-            ].map((item) => (
-              <li key={item.text} className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-                  <item.icon className="h-4 w-4 text-primary" aria-hidden />
-                </span>
-                {item.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative z-10 font-mono text-xs text-muted-foreground">
-          Frontend demo — credentials are pre-filled, any password works.
+        <h1 className="mt-10 text-balance text-4xl font-semibold leading-tight tracking-tight lg:text-5xl">
+          One platform for your entire campus.
+        </h1>
+        <p className="mt-4 max-w-sm text-pretty text-sm leading-relaxed text-muted-foreground">
+          Attendance, notices, mentors and routines — unified for students, staff and administrators.
         </p>
 
-        {/* subtle grid decoration */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.05]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
-            backgroundSize: "44px 44px",
-          }}
-        />
+        <ul className="mt-8 space-y-3 text-sm text-muted-foreground">
+          <li className="flex items-center gap-2.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden /> Sign in with your campus email
+          </li>
+          <li className="flex items-center gap-2.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden /> Role-aware dashboards for every member
+          </li>
+          <li className="flex items-center gap-2.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden /> Attendance, notices and mentor guidance
+          </li>
+        </ul>
       </section>
 
       {/* Form panel */}
-      <section className="flex flex-1 items-center justify-center px-6 py-10 lg:px-14">
-        <div className="w-full max-w-md">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight">Sign in</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Select your role to continue to your dashboard.</p>
-          </div>
+      <section className="relative z-10 w-full max-w-md">
+        <div className="glass-strong rounded-2xl p-7 sm:p-8">
+          <h2 className="text-xl font-semibold tracking-tight">Sign in</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Enter your campus email to continue.</p>
 
-          {/* Role selector */}
-          <div className="grid grid-cols-3 gap-2" role="tablist" aria-label="Select role">
-            {ROLE_ORDER.map((r) => {
-              const RIcon = ROLE_ICON[r]
-              const active = role === r
-              return (
-                <button
-                  key={r}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setRole(r)}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-colors",
-                    active
-                      ? "border-primary bg-primary/5 text-foreground"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40",
-                  )}
-                >
-                  <RIcon className={cn("h-5 w-5", active && "text-primary")} aria-hidden />
-                  <span className="text-xs font-semibold">{ROLE_META[r].label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />
-            {ROLE_META[role].blurb}
-          </p>
-
-          {/* Method switch */}
-          <div className="mt-6 flex rounded-lg border border-border bg-secondary p-1 text-sm">
-            <button
-              onClick={() => setMode("password")}
-              className={cn(
-                "flex-1 rounded-md px-3 py-1.5 font-medium transition-colors",
-                mode === "password" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              Password
-            </button>
-            <button
-              onClick={() => setMode("biometric")}
-              className={cn(
-                "flex-1 rounded-md px-3 py-1.5 font-medium transition-colors",
-                mode === "biometric" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              Fingerprint
-            </button>
-          </div>
-
-          {mode === "password" ? (
-            <form
-              className="mt-6 space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleLogin()
-              }}
-            >
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Campus ID / Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  defaultValue={DEMO_ID[role]}
-                  key={role}
-                  className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  defaultValue="campus123"
-                  className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/30"
-                />
-              </div>
-              <button
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                Sign in as {ROLE_META[role].label}
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </button>
-            </form>
-          ) : (
-            <div className="mt-8 flex flex-col items-center gap-6 rounded-xl border border-border bg-card p-6">
-              <BiometricScanner
-                label={`Scan to sign in as ${ROLE_META[role].label}`}
-                onVerified={() => setTimeout(handleLogin, 700)}
+          <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium">
+                Campus ID / Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setError(null)
+                }}
+                autoComplete="username"
+                className="w-full rounded-lg border border-input bg-card/70 px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
               />
-              <p className="text-center text-xs text-muted-foreground">
-                Uses your device biometrics via WebAuthn where supported, otherwise a simulated scan.
-              </p>
             </div>
-          )}
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError(null)
+                }}
+                autoComplete="current-password"
+                className="w-full rounded-lg border border-input bg-card/70 px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
+              />
+            </div>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.99]"
+            >
+              Sign in
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </button>
+          </form>
+
+          <div className="mt-6 rounded-xl bg-secondary/60 p-4">
+            <p className="text-xs font-semibold text-foreground">Demo credentials</p>
+            <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Student</span> — any student email, e.g.{" "}
+                <span className="font-mono">aisha.karim@campus.edu</span>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Staff</span> — any staff email, e.g.{" "}
+                <span className="font-mono">rahul.menon@campus.edu</span>
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Admin</span> —{" "}
+                <span className="font-mono">{ADMIN_CREDS.email}</span> /{" "}
+                <span className="font-mono">{ADMIN_CREDS.password}</span>
+              </li>
+            </ul>
+          </div>
+
+          <p className="mt-5 text-center text-sm text-muted-foreground">
             New to the campus?{" "}
             <Link href="/apply" className="font-semibold text-primary hover:underline">
               Apply for admission
             </Link>
           </p>
         </div>
+
+        <div className="mt-5 flex justify-center lg:hidden">
+          <ThemeToggle />
+        </div>
       </section>
+
+      {/* Theme toggle — desktop, top right */}
+      <div className="fixed right-5 top-5 z-20 hidden lg:block">
+        <ThemeToggle />
+      </div>
     </main>
   )
 }

@@ -117,11 +117,11 @@ export function FeesSection() {
                   <td className="py-3 text-muted-foreground">{f.dueDate}</td>
                   <td className="py-3">
                     {f.status === "paid" ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
+                      <span className="pill bg-success/10 text-success">
                         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Paid · {METHOD_LABEL[f.method ?? "upi"]}
                       </span>
                     ) : (
-                      <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">Pending</span>
+                      <span className="pill bg-warning/15 text-warning">Pending</span>
                     )}
                   </td>
                   <td className="py-3 text-right">
@@ -130,7 +130,7 @@ export function FeesSection() {
                     ) : (
                       <button
                         onClick={() => startPay(f)}
-                        className="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                        className="rounded-sm bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
                       >
                         Pay now
                       </button>
@@ -152,7 +152,7 @@ export function FeesSection() {
       >
         {step === "method" && paying && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between rounded-xl bg-secondary/60 px-4 py-3">
+            <div className="flex items-center justify-between rounded-md border border-border bg-secondary/60 px-4 py-3">
               <div>
                 <p className="text-sm text-muted-foreground">Amount to pay</p>
                 <p className="font-mono text-2xl font-bold text-primary">{formatINR(paying.amount)}</p>
@@ -166,8 +166,8 @@ export function FeesSection() {
                   key={m.id}
                   onClick={() => setMethod(m.id)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
-                    method === m.id ? "border-primary bg-primary/5" : "border-border hover:bg-secondary",
+                    "flex w-full items-center gap-3 rounded-md border px-4 py-3 text-sm font-medium transition-colors",
+                    method === m.id ? "border-primary bg-primary/[0.04]" : "border-border hover:bg-secondary",
                   )}
                 >
                   <span className="text-primary">{m.icon}</span>
@@ -176,7 +176,7 @@ export function FeesSection() {
                 </button>
               ))}
             </div>
-            <div className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+            <div className="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
               This is a simulated payment — no real money is moved. The receipt is generated instantly.
             </div>
             <button
@@ -212,7 +212,7 @@ export function FeesSection() {
                 <p className="text-sm text-muted-foreground">{formatINR(newReceipt.amount)} · {METHOD_LABEL[newReceipt.method]}</p>
               </div>
             </div>
-            <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm">
+            <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-sm">
               <dl className="space-y-1">
                 <div className="flex justify-between"><dt className="text-muted-foreground">Receipt</dt><dd className="font-mono font-semibold">{newReceipt.id}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted-foreground">Transaction</dt><dd className="font-mono">{newReceipt.transactionId}</dd></div>
@@ -262,7 +262,7 @@ function ReceiptsList({ receipts }: { receipts: Receipt[] }) {
     <div className="space-y-3">
       {receipts.map((r) => (
         <Card key={r.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
             <ReceiptIcon className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -273,7 +273,7 @@ function ReceiptsList({ receipts }: { receipts: Receipt[] }) {
           </div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-lg font-bold">{formatINR(r.amount)}</span>
-            <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+            <span className="pill bg-secondary text-muted-foreground">
               {METHOD_LABEL[r.method]}
             </span>
             <button
@@ -303,7 +303,7 @@ function ReceiptsList({ receipts }: { receipts: Receipt[] }) {
                 downloadHtml(`receipt-${r.id}.html`, "Fee Receipt", body)
               }}
               aria-label={`Download receipt ${r.id}`}
-              className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              className="rounded-sm border border-border p-2 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >
               <Download className="h-4 w-4" aria-hidden />
             </button>

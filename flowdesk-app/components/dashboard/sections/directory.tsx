@@ -42,7 +42,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
           onChange={(e) => setQuery(e.target.value)}
           type="search"
           placeholder={`Search ${kind}…`}
-          className="w-full rounded-lg border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          className="w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
         />
       </div>
 
@@ -60,7 +60,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                       : `${p.designation} · ${p.department}`}
                   </p>
                 </div>
-                <span className="hidden shrink-0 rounded-lg bg-secondary px-2.5 py-1 font-mono text-xs text-muted-foreground sm:block">
+                <span className="hidden shrink-0 pill bg-secondary text-muted-foreground sm:block">
                   {p.id}
                 </span>
               </button>

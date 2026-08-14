@@ -8,10 +8,10 @@ import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitive
 import { cn } from "@/lib/utils"
 
 const STATUS_BADGE: Record<AdmissionStatus, string> = {
-  submitted: "bg-primary/10 text-primary",
-  reviewing: "bg-warning/15 text-warning",
-  accepted: "bg-success/10 text-success",
-  rejected: "bg-destructive/10 text-destructive",
+  submitted: "pill bg-primary/10 text-primary",
+  reviewing: "pill bg-warning/15 text-warning",
+  accepted: "pill bg-success/10 text-success",
+  rejected: "pill bg-destructive/10 text-destructive",
 }
 
 const STATUS_LABEL: Record<AdmissionStatus, string> = {
@@ -63,7 +63,7 @@ export function AdmissionsSection() {
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors",
+              "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
             )}
           >
@@ -81,7 +81,7 @@ export function AdmissionsSection() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{a.applicantName}</p>
-                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_BADGE[a.status])}>
+                    <span className={cn(STATUS_BADGE[a.status])}>
                       {STATUS_LABEL[a.status]}
                     </span>
                   </div>
@@ -90,7 +90,7 @@ export function AdmissionsSection() {
                   </p>
                   <p className="mt-1 text-sm">
                     {a.programName}
-                    <span className="ml-2 rounded-lg bg-secondary px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground">
+                    <span className="ml-2 pill bg-secondary text-muted-foreground">
                       Score {a.score}
                     </span>
                   </p>
@@ -98,7 +98,7 @@ export function AdmissionsSection() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {a.status === "accepted" && (
-                    <span className="rounded-lg bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                    <span className="pill bg-success/10 text-success">
                       {program ? `Fee ${program.fee.toLocaleString("en-IN")}/yr` : ""}
                     </span>
                   )}
@@ -118,7 +118,7 @@ export function AdmissionsSection() {
                   defaultValue={a.notes}
                   onChange={(e) => setNotes((n) => ({ ...n, [a.id]: e.target.value }))}
                   placeholder="Add a review note…"
-                  className="flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                  className="flex-1 rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
                 />
                 <div className="flex shrink-0 items-center gap-2">
                   <button
@@ -131,7 +131,7 @@ export function AdmissionsSection() {
                   <button
                     onClick={() => setStatus(a.id, "rejected", notes[a.id] ?? a.notes)}
                     disabled={a.status === "rejected"}
-                    className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
                   >
                     <XCircle className="h-4 w-4" aria-hidden /> Reject
                   </button>

@@ -1,3 +1,5 @@
+import type { Role } from "@/lib/mock-data"
+
 export type ComplaintCategory = "Academics" | "Hostel" | "Library" | "IT" | "Transport" | "Other"
 export type ComplaintStatus = "open" | "in-progress" | "resolved"
 
@@ -16,7 +18,7 @@ export type Complaint = {
   status: ComplaintStatus
   createdAt: string
   raisedByName: string
-  raisedByRole: "student" | "staff"
+  raisedByRole: Role
   comments: ComplaintComment[]
 }
 

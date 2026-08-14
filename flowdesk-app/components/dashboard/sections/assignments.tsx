@@ -172,10 +172,10 @@ function MyTasks({
 
 function StatusChip({ status }: { status: "pending" | "overdue" | "submitted" | "graded" }) {
   const map = {
-    pending: "bg-primary/10 text-primary",
-    overdue: "bg-destructive/10 text-destructive",
-    submitted: "bg-chart-2/15 text-chart-2",
-    graded: "bg-success/10 text-success",
+    pending: "pill bg-primary/10 text-primary",
+    overdue: "pill bg-destructive/10 text-destructive",
+    submitted: "pill bg-chart-2/15 text-chart-2",
+    graded: "pill bg-success/10 text-success",
   }
   const label = {
     pending: "Pending",
@@ -183,7 +183,7 @@ function StatusChip({ status }: { status: "pending" | "overdue" | "submitted" | 
     submitted: "Submitted",
     graded: "Graded",
   }
-  return <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", map[status])}>{label[status]}</span>
+  return <span className={cn(map[status])}>{label[status]}</span>
 }
 
 function GradeSubmissions({
@@ -217,7 +217,7 @@ function GradeSubmissions({
         <select
           value={assignmentId}
           onChange={(e) => setAssignmentId(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+          className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
         >
           {assignments.map((a) => (
             <option key={a.id} value={a.id}>
@@ -247,13 +247,13 @@ function GradeSubmissions({
                   placeholder="Marks"
                   defaultValue={sub.marks ?? ""}
                   onChange={(e) => setMarks((m) => ({ ...m, [sub.id]: e.target.value }))}
-                  className="w-24 rounded-lg border border-input bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-primary"
+                  className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-primary"
                 />
                 <input
                   placeholder="Feedback"
                   defaultValue={sub.feedback}
                   onChange={(e) => setFeedback((f) => ({ ...f, [sub.id]: e.target.value }))}
-                  className="w-40 rounded-lg border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-primary"
+                  className="w-40 rounded-sm border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-primary"
                 />
                 <button
                   onClick={() => save(sub)}
@@ -311,7 +311,7 @@ function ManageAssignments({
   }
 
   const inputCls =
-    "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+    "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -382,7 +382,7 @@ function ManageAssignments({
               </div>
               <button
                 onClick={() => setAssignments((prev) => prev.filter((x) => x.id !== a.id))}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="rounded-sm p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label={`Delete ${a.title}`}
               >
                 <Trash2 className="h-4 w-4" aria-hidden />

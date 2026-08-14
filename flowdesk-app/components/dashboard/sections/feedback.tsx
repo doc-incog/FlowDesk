@@ -60,7 +60,7 @@ export function FeedbackSection() {
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors",
+              "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
             )}
           >
@@ -82,7 +82,7 @@ export function FeedbackSection() {
                     {t.type === "teacher" ? "Teacher" : "Event"} · {t.subtitle}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-lg bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary">
+                <span className="shrink-0 pill bg-primary/10 text-primary">
                   {avg > 0 ? avg.toFixed(1) : "—"}
                 </span>
               </div>
@@ -94,7 +94,7 @@ export function FeedbackSection() {
               </div>
               <button
                 onClick={() => openModal(t)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+                className="flex w-full items-center justify-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
               >
                 <Star className="h-4 w-4" aria-hidden /> Rate
               </button>
@@ -117,7 +117,7 @@ export function FeedbackSection() {
               onChange={(e) => setComment(e.target.value)}
               rows={3}
               placeholder="Anything specific you'd like to add? (optional)"
-              className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+              className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
             />
             <button
               onClick={submit}

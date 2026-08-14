@@ -17,10 +17,10 @@ const TABS: TabItem[] = [
 ]
 
 const STATUS_BADGE: Record<ScholarshipStatus, string> = {
-  submitted: "bg-primary/10 text-primary",
-  "under-review": "bg-warning/15 text-warning",
-  approved: "bg-success/10 text-success",
-  rejected: "bg-destructive/10 text-destructive",
+  submitted: "pill bg-primary/10 text-primary",
+  "under-review": "pill bg-warning/15 text-warning",
+  approved: "pill bg-success/10 text-success",
+  rejected: "pill bg-destructive/10 text-destructive",
 }
 
 const STATUS_LABEL: Record<ScholarshipStatus, string> = {
@@ -95,7 +95,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
       >
         {applyTarget && !applied ? (
           <div className="space-y-4">
-            <div className="rounded-xl bg-secondary/60 px-4 py-3 text-sm">
+            <div className="rounded-md border border-border bg-secondary/60 px-4 py-3 text-sm">
               <dl className="space-y-1">
                 <div className="flex justify-between"><dt className="text-muted-foreground">Amount</dt><dd className="font-mono font-bold">{applyTarget.amount.toLocaleString("en-IN")}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted-foreground">Eligibility</dt><dd>{applyTarget.eligibility}</dd></div>
@@ -141,7 +141,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
 function ScholarshipCard({ s, canApply, onApply }: { s: Scholarship; canApply: boolean; onApply: () => void }) {
   return (
     <Card className="flex flex-col">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-chart-5/10 text-chart-5">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
         <Award className="h-5 w-5" aria-hidden />
       </span>
       <p className="mt-3 font-semibold leading-snug">{s.name}</p>
@@ -189,7 +189,7 @@ function StudentApplications({ applications }: { applications: ScholarshipApplic
                 {a.id} · Submitted {a.submittedAt} · Docs: {a.docs.join(", ") || "—"}
               </p>
             </div>
-            <span className={cn("self-start rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_BADGE[a.status])}>
+            <span className={cn("self-start", STATUS_BADGE[a.status])}>
               {STATUS_LABEL[a.status]}
             </span>
           </Card>
@@ -235,7 +235,7 @@ function AdminScholarships({
             key={f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors",
+              "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
             )}
           >
@@ -252,7 +252,7 @@ function AdminScholarships({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-semibold">{a.studentName}</p>
-                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_BADGE[a.status])}>
+                  <span className={cn(STATUS_BADGE[a.status])}>
                     {STATUS_LABEL[a.status]}
                   </span>
                 </div>
@@ -272,7 +272,7 @@ function AdminScholarships({
                 <button
                   onClick={() => setStatus(a.id, "rejected")}
                   disabled={a.status === "rejected"}
-                  className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
                 >
                   <XCircle className="h-4 w-4" aria-hidden /> Reject
                 </button>

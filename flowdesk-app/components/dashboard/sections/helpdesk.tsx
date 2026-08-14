@@ -16,9 +16,9 @@ const TABS: TabItem[] = [
 ]
 
 const STATUS_BADGE: Record<ComplaintStatus, string> = {
-  open: "bg-destructive/10 text-destructive",
-  "in-progress": "bg-warning/15 text-warning",
-  resolved: "bg-success/10 text-success",
+  open: "pill bg-destructive/10 text-destructive",
+  "in-progress": "pill bg-warning/15 text-warning",
+  resolved: "pill bg-success/10 text-success",
 }
 
 const STATUS_LABEL: Record<ComplaintStatus, string> = {
@@ -91,7 +91,7 @@ function NewComplaint({
                 key={c}
                 onClick={() => setCategory(c)}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                  "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
                   category === c ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
                 )}
               >
@@ -106,7 +106,7 @@ function NewComplaint({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Brief summary of the issue"
-            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+            className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
           />
         </div>
         <div className="space-y-1.5">
@@ -116,7 +116,7 @@ function NewComplaint({
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             placeholder="Describe the issue in detail…"
-            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+            className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
           />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -181,8 +181,8 @@ function ComplaintCard({
     <Card>
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">{complaint.category}</span>
-          <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS_BADGE[complaint.status])}>
+          <span className="pill bg-secondary text-muted-foreground">{complaint.category}</span>
+          <span className={cn(STATUS_BADGE[complaint.status])}>
             {STATUS_LABEL[complaint.status]}
           </span>
           <span className="ml-auto font-mono text-xs text-muted-foreground">
@@ -206,7 +206,7 @@ function ComplaintCard({
         {expanded && (
           <div className="mt-3 space-y-3">
             {complaint.comments.map((cm) => (
-              <div key={cm.id} className="rounded-xl bg-secondary/50 px-3.5 py-2.5">
+              <div key={cm.id} className="rounded-md border border-border bg-secondary/50 px-3.5 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{cm.author}</span>
                   <span className="font-mono text-[10px] text-muted-foreground">{cm.at}</span>
@@ -225,7 +225,7 @@ function ComplaintCard({
                       if (e.key === "Enter") addComment()
                     }}
                     placeholder="Add a comment…"
-                    className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                    className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
                   />
                   <button
                     onClick={addComment}
@@ -240,7 +240,7 @@ function ComplaintCard({
                     onClick={() =>
                       setComplaints((prev) => prev.map((c) => (c.id === complaint.id ? { ...c, status: "resolved" } : c)))
                     }
-                    className="mt-2 rounded-lg border border-success/40 px-3 py-1.5 text-sm font-semibold text-success transition-colors hover:bg-success/10"
+                    className="mt-2 rounded-sm border border-success/40 px-3 py-1.5 text-sm font-semibold text-success transition-colors hover:bg-success/10"
                   >
                     Mark resolved
                   </button>

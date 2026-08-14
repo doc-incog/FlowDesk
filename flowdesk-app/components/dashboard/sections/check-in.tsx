@@ -54,7 +54,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               </div>
               <button
                 onClick={() => setCheckedIn(false)}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
+                className="rounded-sm border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
               >
                 Reset demo
               </button>
@@ -73,7 +73,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         <div className="space-y-4 lg:col-span-3">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Card className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/10 text-success">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
               </span>
               <div>
@@ -82,7 +82,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               </div>
             </Card>
             <Card className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
                 <Clock className="h-5 w-5" aria-hidden />
               </span>
               <div>
@@ -91,7 +91,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               </div>
             </Card>
             <Card className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
                 <Fingerprint className="h-5 w-5" aria-hidden />
               </span>
               <div>
@@ -103,14 +103,14 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
 
           <Card>
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
                 <ScanLine className="h-5 w-5" aria-hidden />
               </span>
               <div className="flex-1">
                 <p className="text-sm font-semibold">Science Block — Scanner #3</p>
                 <p className="text-xs text-muted-foreground">Last sync {nowTime()}</p>
               </div>
-              <span className="flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+              <span className="pill bg-success/10 text-success">
                 <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden /> Online
               </span>
             </div>

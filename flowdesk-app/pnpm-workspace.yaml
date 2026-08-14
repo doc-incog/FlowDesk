@@ -1,0 +1,4 @@
+onlyBuiltDependencies:
+  - msw
+  - unrs-resolver
+verifyDepsBeforeRun: false

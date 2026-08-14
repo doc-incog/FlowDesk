@@ -31,16 +31,16 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card shadow-xl",
+          "relative z-10 w-full max-w-lg overflow-hidden rounded-md border border-border bg-card shadow-[0_16px_50px_rgba(60,40,10,0.2)]",
           className,
         )}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h3 className="text-base font-bold tracking-tight">{title}</h3>
+          <h3 className="font-display text-lg font-semibold tracking-tight">{title}</h3>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>

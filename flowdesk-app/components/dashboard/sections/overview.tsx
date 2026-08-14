@@ -80,7 +80,7 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
           />
           <ul className="space-y-3">
             {todaysClasses.map((s) => (
-              <li key={s.id} className="flex items-center gap-4 rounded-xl border border-border p-3">
+              <li key={s.id} className="flex items-center gap-4 rounded-md border border-border p-3">
                 <div className="w-16 shrink-0 text-center">
                   <p className="font-mono text-sm font-bold">{s.start}</p>
                   <p className="font-mono text-xs text-muted-foreground">{s.end}</p>
@@ -165,7 +165,7 @@ function QuickAction({ icon, label, onClick }: { icon: React.ReactNode; label: s
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-xl border border-border p-4 text-sm font-medium transition-colors hover:border-primary hover:bg-primary/5"
+      className="flex flex-col items-center gap-2 rounded-md border border-border p-4 text-sm font-medium transition-colors hover:border-primary hover:bg-secondary"
     >
       <span className="text-primary">{icon}</span>
       {label}

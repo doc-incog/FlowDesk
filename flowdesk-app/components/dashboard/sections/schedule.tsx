@@ -67,13 +67,13 @@ export function ScheduleSection({ role }: { role: Role }) {
               <div key={d} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold">{d}</p>
-                  <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                  <span className="pill bg-secondary text-muted-foreground">
                     {byDay(d).length}
                   </span>
                 </div>
                 <div className="space-y-3">
                   {byDay(d).length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                       No classes
                     </div>
                   ) : (
@@ -92,7 +92,7 @@ export function ScheduleSection({ role }: { role: Role }) {
                   key={d}
                   onClick={() => setDay(d)}
                   className={cn(
-                    "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    "shrink-0 rounded-sm px-4 py-2 text-sm font-medium transition-colors",
                     day === d ? "bg-primary text-primary-foreground" : "border border-border bg-card",
                   )}
                 >
@@ -120,7 +120,7 @@ export function ScheduleSection({ role }: { role: Role }) {
 
 function SlotCard({ slot }: { slot: ScheduleSlot }) {
   return (
-    <div className="rounded-xl border border-l-4 border-border border-l-primary bg-card p-4">
+    <div className="rounded-xl border border-border bg-card/70 p-4">
       <p className="font-mono text-xs font-semibold text-muted-foreground">
         {slot.start} – {slot.end}
       </p>
@@ -166,13 +166,13 @@ function ConflictsView({ conflicts }: { conflicts: Conflict[] }) {
             <p className="text-sm font-bold text-warning">
               {c.reason === "room" ? `Room ${c.a.room} double-booked` : `Staff ${c.a.staff.split(" ")[0]} double-booked`}
             </p>
-            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">
+            <span className="pill bg-warning/15 text-warning">
               {c.a.day} {c.a.start}–{c.a.end}
             </span>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {[c.a, c.b].map((s) => (
-              <div key={s.id} className="rounded-xl border border-border bg-secondary/40 p-3">
+              <div key={s.id} className="rounded-md border border-border bg-secondary/40 p-3">
                 <p className="font-semibold">{s.module}</p>
                 <p className="font-mono text-xs text-muted-foreground">
                   {s.code} · {s.start}–{s.end}
@@ -240,7 +240,7 @@ function AddSlotView({
   }
 
   const inputCls =
-    "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+    "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
