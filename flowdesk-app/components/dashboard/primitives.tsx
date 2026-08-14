@@ -4,7 +4,7 @@ import type { Role } from "@/lib/mock-data"
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-sm", className)}>{children}</div>
+    <div className={cn("rounded-xl border border-border bg-card p-5", className)}>{children}</div>
   )
 }
 
@@ -44,17 +44,17 @@ export function StatCard({
   const toneMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
     success: "bg-success/10 text-success",
-    warning: "bg-warning/15 text-warning",
-    "chart-5": "bg-chart-5/10 text-chart-5",
+    warning: "bg-warning/10 text-warning",
+    "chart-5": "bg-secondary text-muted-foreground",
   }
   return (
     <Card className="flex items-center gap-4">
-      <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", toneMap[tone])}>
+      <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg", toneMap[tone])}>
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-sm text-muted-foreground">{label}</p>
-        <p className="font-mono text-2xl font-bold leading-tight tracking-tight">{value}</p>
+        <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="font-mono text-xl font-bold leading-tight tracking-tight">{value}</p>
         {hint && <p className="mt-0.5 truncate text-xs text-muted-foreground">{hint}</p>}
       </div>
     </Card>
@@ -74,15 +74,11 @@ export function Avatar({ initials, className }: { initials: string; className?: 
   )
 }
 
-const roleStyles: Record<Role, string> = {
-  student: "bg-chart-1/10 text-chart-1",
-  staff: "bg-chart-2/15 text-chart-2",
-  admin: "bg-chart-3/20 text-warning",
-}
-
 export function RoleBadge({ role }: { role: Role }) {
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", roleStyles[role])}>{role}</span>
+    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
+      {role}
+    </span>
   )
 }
 

@@ -40,12 +40,12 @@ export function MentorSection({ role, mentorId }: { role: Role; mentorId?: strin
       <SectionHeading title="My mentor" description="Your assigned faculty mentor and how to reach them." />
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-col items-center gap-4 bg-sidebar px-6 py-8 text-center text-sidebar-foreground sm:flex-row sm:text-left">
-          <Avatar initials={mentor.avatarInitials} className="h-20 w-20 bg-sidebar-primary text-xl text-sidebar-primary-foreground" />
+        <div className="flex flex-col items-center gap-4 bg-secondary/60 px-6 py-8 text-center sm:flex-row sm:text-left">
+          <Avatar initials={mentor.avatarInitials} className="h-20 w-20 bg-primary text-xl text-primary-foreground" />
           <div>
             <p className="text-xl font-bold">{mentor.name}</p>
-            <p className="text-sm text-sidebar-foreground/75">{mentor.designation} · {mentor.department}</p>
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sidebar-accent px-2.5 py-1 text-xs font-medium">
+            <p className="text-sm text-muted-foreground">{mentor.designation} · {mentor.department}</p>
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <Users className="h-3.5 w-3.5" aria-hidden /> {mentor.mentees} mentees
             </span>
           </div>

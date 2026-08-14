@@ -15,11 +15,19 @@ import {
   Menu,
   X,
   Search,
+  ClipboardList,
+  FileText,
+  CreditCard,
+  Award,
+  ClipboardCheck,
+  LifeBuoy,
+  MessageSquareText,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { NOTIFICATIONS, ROLE_META, type Role } from "@/lib/mock-data"
 import { Avatar, RoleBadge } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
+import { AIChat } from "@/components/ai-chat"
 
 import { OverviewSection } from "@/components/dashboard/sections/overview"
 import { CheckInSection } from "@/components/dashboard/sections/check-in"
@@ -27,6 +35,13 @@ import { NotificationsSection } from "@/components/dashboard/sections/notificati
 import { DirectorySection } from "@/components/dashboard/sections/directory"
 import { MentorSection } from "@/components/dashboard/sections/mentor"
 import { ScheduleSection } from "@/components/dashboard/sections/schedule"
+import { ExamsSection } from "@/components/dashboard/sections/exams"
+import { AssignmentsSection } from "@/components/dashboard/sections/assignments"
+import { FeesSection } from "@/components/dashboard/sections/fees"
+import { ScholarshipsSection } from "@/components/dashboard/sections/scholarships"
+import { AdmissionsSection } from "@/components/dashboard/sections/admissions"
+import { HelpdeskSection } from "@/components/dashboard/sections/helpdesk"
+import { FeedbackSection } from "@/components/dashboard/sections/feedback"
 
 export type SectionId =
   | "overview"
@@ -36,6 +51,13 @@ export type SectionId =
   | "staff"
   | "mentor"
   | "schedule"
+  | "exams"
+  | "assignments"
+  | "fees"
+  | "scholarships"
+  | "admissions"
+  | "helpdesk"
+  | "feedback"
 
 type NavItem = {
   id: SectionId
@@ -52,6 +74,13 @@ const NAV: NavItem[] = [
   { id: "staff", label: "Staff", icon: Users, roles: ["admin"] },
   { id: "mentor", label: "Mentor", icon: UserRound, roles: ["student", "staff"] },
   { id: "schedule", label: "Schedule", icon: CalendarDays, roles: ["student", "staff", "admin"] },
+  { id: "exams", label: "Exams & Results", icon: ClipboardList, roles: ["student", "staff", "admin"] },
+  { id: "assignments", label: "Assignments", icon: FileText, roles: ["student", "staff", "admin"] },
+  { id: "fees", label: "Online Fees", icon: CreditCard, roles: ["student", "admin"] },
+  { id: "scholarships", label: "Scholarships", icon: Award, roles: ["student", "admin"] },
+  { id: "admissions", label: "Admissions", icon: ClipboardCheck, roles: ["admin"] },
+  { id: "helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: ["student", "staff", "admin"] },
+  { id: "feedback", label: "Feedback", icon: MessageSquareText, roles: ["student", "staff", "admin"] },
 ]
 
 export function DashboardShell() {
@@ -98,6 +127,20 @@ export function DashboardShell() {
         return <MentorSection role={user.role} mentorId={user.mentorId} />
       case "schedule":
         return <ScheduleSection role={user.role} />
+      case "exams":
+        return <ExamsSection role={user.role} />
+      case "assignments":
+        return <AssignmentsSection role={user.role} />
+      case "fees":
+        return <FeesSection />
+      case "scholarships":
+        return <ScholarshipsSection role={user.role} />
+      case "admissions":
+        return <AdmissionsSection />
+      case "helpdesk":
+        return <HelpdeskSection role={user.role} />
+      case "feedback":
+        return <FeedbackSection />
       default:
         return null
     }
@@ -106,13 +149,13 @@ export function DashboardShell() {
   const SidebarContent = (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Building2 className="h-5 w-5" aria-hidden />
         </div>
         <span className="text-base font-bold tracking-tight text-sidebar-foreground">FlowDesk</span>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Dashboard sections">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Dashboard sections">
         {navItems.map((item) => {
           const isActive = active === item.id
           const label = item.id === "mentor" ? mentorLabel : item.label
@@ -165,7 +208,7 @@ export function DashboardShell() {
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 bg-sidebar lg:block">{SidebarContent}</aside>
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">{SidebarContent}</aside>
 
       {/* Mobile sidebar */}
       {mobileOpen && (
@@ -175,7 +218,7 @@ export function DashboardShell() {
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-sidebar">
+          <aside className="absolute left-0 top-0 h-full w-64 border-r border-sidebar-border bg-sidebar">
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute right-3 top-4 text-sidebar-foreground/70"
@@ -231,6 +274,8 @@ export function DashboardShell() {
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>
+
+      <AIChat />
     </div>
   )
 }

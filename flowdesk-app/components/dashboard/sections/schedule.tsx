@@ -1,25 +1,46 @@
 "use client"
 
 import { useState } from "react"
-import { MapPin, User } from "lucide-react"
-import { SCHEDULE, type Role, type ScheduleSlot } from "@/lib/mock-data"
+import { AlertTriangle, MapPin, Plus, User } from "lucide-react"
+import { SCHEDULE, STAFF, type Role, type ScheduleSlot } from "@/lib/mock-data"
+import { useLocalStorage } from "@/lib/storage"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
+import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
 
-const MODULE_TONE: Record<string, string> = {
-  CS301: "border-l-chart-1",
-  CS302: "border-l-chart-2",
-  CS303: "border-l-chart-3",
-  CS304: "border-l-chart-4",
-  CS305: "border-l-chart-5",
-  CS306: "border-l-primary",
+type Conflict = {
+  a: ScheduleSlot
+  b: ScheduleSlot
+  reason: "room" | "staff"
+}
+
+function overlaps(x: ScheduleSlot, y: ScheduleSlot): boolean {
+  return x.start < y.end && y.start < x.end
+}
+
+function findConflicts(schedule: ScheduleSlot[]): Conflict[] {
+  const conflicts: Conflict[] = []
+  for (let i = 0; i < schedule.length; i++) {
+    for (let j = i + 1; j < schedule.length; j++) {
+      const a = schedule[i]
+      const b = schedule[j]
+      if (a.day !== b.day || !overlaps(a, b)) continue
+      if (a.room === b.room) conflicts.push({ a, b, reason: "room" })
+      else if (a.staff === b.staff) conflicts.push({ a, b, reason: "staff" })
+    }
+  }
+  return conflicts
 }
 
 export function ScheduleSection({ role }: { role: Role }) {
+  const [schedule, setSchedule] = useLocalStorage<ScheduleSlot[]>("flowdesk.schedule", SCHEDULE)
   const [day, setDay] = useState<string>("Mon")
-  const byDay = (d: string) => SCHEDULE.filter((s) => s.day === d).sort((a, b) => a.start.localeCompare(b.start))
+  const [tab, setTab] = useState<string>("routine")
+  const byDay = (d: string) => schedule.filter((s) => s.day === d).sort((a, b) => a.start.localeCompare(b.start))
+  const conflicts = findConflicts(schedule)
+
   const desc =
     role === "student"
       ? "Your weekly module routine."
@@ -27,64 +48,79 @@ export function ScheduleSection({ role }: { role: Role }) {
         ? "Your teaching schedule for the week."
         : "Campus-wide module routine."
 
+  const tabs: TabItem[] = [{ id: "routine", label: "Weekly routine" }]
+  if (role !== "student") {
+    tabs.push({ id: "conflicts", label: `Conflicts${conflicts.length ? ` (${conflicts.length})` : ""}` })
+  }
+  if (role === "admin") tabs.push({ id: "add", label: "Add slot" })
+
   return (
     <div className="space-y-6">
       <SectionHeading title="Module routine" description={desc} />
+      <SectionTabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {/* Weekly grid — desktop */}
-      <div className="hidden grid-cols-5 gap-4 lg:grid">
-        {DAYS.map((d) => (
-          <div key={d} className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-bold">{d}</p>
-              <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-xs text-muted-foreground">
-                {byDay(d).length}
-              </span>
+      {tab === "routine" && (
+        <>
+          {/* Weekly grid — desktop */}
+          <div className="hidden grid-cols-5 gap-4 lg:grid">
+            {DAYS.map((d) => (
+              <div key={d} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold">{d}</p>
+                  <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                    {byDay(d).length}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {byDay(d).length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                      No classes
+                    </div>
+                  ) : (
+                    byDay(d).map((s) => <SlotCard key={s.id} slot={s} />)
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Day picker — mobile */}
+          <div className="lg:hidden">
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              {DAYS.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDay(d)}
+                  className={cn(
+                    "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    day === d ? "bg-primary text-primary-foreground" : "border border-border bg-card",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
             </div>
             <div className="space-y-3">
-              {byDay(d).length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                  No classes
-                </div>
+              {byDay(day).length === 0 ? (
+                <Card className="py-8 text-center text-sm text-muted-foreground">No classes scheduled.</Card>
               ) : (
-                byDay(d).map((s) => <SlotCard key={s.id} slot={s} />)
+                byDay(day).map((s) => <SlotCard key={s.id} slot={s} />)
               )}
             </div>
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
-      {/* Day picker — mobile */}
-      <div className="lg:hidden">
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-          {DAYS.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDay(d)}
-              className={cn(
-                "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                day === d ? "bg-primary text-primary-foreground" : "border border-border bg-card",
-              )}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-3">
-          {byDay(day).length === 0 ? (
-            <Card className="py-8 text-center text-sm text-muted-foreground">No classes scheduled.</Card>
-          ) : (
-            byDay(day).map((s) => <SlotCard key={s.id} slot={s} />)
-          )}
-        </div>
-      </div>
+      {tab === "conflicts" && <ConflictsView conflicts={conflicts} />}
+
+      {tab === "add" && <AddSlotView schedule={schedule} setSchedule={setSchedule} />}
     </div>
   )
 }
 
 function SlotCard({ slot }: { slot: ScheduleSlot }) {
   return (
-    <div className={cn("rounded-xl border border-l-4 border-border bg-card p-4", MODULE_TONE[slot.code] ?? "border-l-primary")}>
+    <div className="rounded-xl border border-l-4 border-border border-l-primary bg-card p-4">
       <p className="font-mono text-xs font-semibold text-muted-foreground">
         {slot.start} – {slot.end}
       </p>
@@ -98,6 +134,176 @@ function SlotCard({ slot }: { slot: ScheduleSlot }) {
           <User className="h-3.5 w-3.5" aria-hidden /> {slot.staff}
         </p>
       </div>
+    </div>
+  )
+}
+
+function ConflictsView({ conflicts }: { conflicts: Conflict[] }) {
+  if (conflicts.length === 0) {
+    return (
+      <Card className="py-12 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
+          <AlertTriangle className="h-6 w-6" aria-hidden />
+        </span>
+        <p className="mt-3 font-semibold">No scheduling conflicts</p>
+        <p className="text-sm text-muted-foreground">All rooms and faculty are free of double-bookings.</p>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <Card className="flex items-start gap-3 border-warning/40 bg-warning/5">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
+        <p className="text-sm text-muted-foreground">
+          {conflicts.length} double-booking{conflicts.length === 1 ? "" : "s"} detected. A slot overlaps another on the
+          same day in the same <b className="text-foreground">room</b> or with the same <b className="text-foreground">staff member</b>.
+        </p>
+      </Card>
+      {conflicts.map((c, i) => (
+        <Card key={i} className="border-warning/40">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-warning">
+              {c.reason === "room" ? `Room ${c.a.room} double-booked` : `Staff ${c.a.staff.split(" ")[0]} double-booked`}
+            </p>
+            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">
+              {c.a.day} {c.a.start}–{c.a.end}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {[c.a, c.b].map((s) => (
+              <div key={s.id} className="rounded-xl border border-border bg-secondary/40 p-3">
+                <p className="font-semibold">{s.module}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {s.code} · {s.start}–{s.end}
+                </p>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" aria-hidden /> {s.room} · {s.staff}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function AddSlotView({
+  schedule,
+  setSchedule,
+}: {
+  schedule: ScheduleSlot[]
+  setSchedule: React.Dispatch<React.SetStateAction<ScheduleSlot[]>>
+}) {
+  const modules = Array.from(new Map(schedule.map((s) => [s.code, s.module])).entries())
+  const [form, setForm] = useState({
+    day: "Mon",
+    start: "09:00",
+    end: "10:30",
+    code: "",
+    room: "",
+    staff: STAFF[0]?.name ?? "",
+  })
+  const [error, setError] = useState("")
+  const [conflict, setConflict] = useState<string | null>(null)
+
+  const add = () => {
+    if (!form.code || !form.room) {
+      setError("Module and room are required.")
+      return
+    }
+    const moduleName = modules.find(([code]) => code === form.code)?.[1] ?? ""
+    const newSlot: ScheduleSlot = {
+      id: `s${Date.now()}`,
+      day: form.day,
+      start: form.start,
+      end: form.end,
+      module: moduleName,
+      code: form.code,
+      room: form.room,
+      staff: form.staff,
+    }
+    const clashes = schedule.filter(
+      (s) => s.day === form.day && overlaps(s, newSlot) && (s.room === form.room || s.staff === form.staff),
+    )
+    if (clashes.length > 0) {
+      setConflict(
+        `Clash with ${clashes.map((c) => `${c.module} (${c.start}–${c.end})`).join(", ")} — same room or staff member.`,
+      )
+      return
+    }
+    setSchedule((prev) => [...prev, newSlot])
+    setConflict(null)
+    setError("")
+    setForm((f) => ({ ...f, code: "", room: "" }))
+  }
+
+  const inputCls =
+    "w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <Card>
+        <SectionHeading title="Add a class slot" description="Conflicts are detected automatically before the slot is saved." />
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Day</label>
+              <select value={form.day} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} className={inputCls}>
+                {DAYS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Start</label>
+              <input type="time" value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">End</label>
+              <input type="time" value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Module</label>
+            <select value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className={inputCls}>
+              <option value="">Select…</option>
+              {modules.map(([code, name]) => (
+                <option key={code} value={code}>
+                  {code} · {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Room</label>
+              <input value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Faculty</label>
+              <select value={form.staff} onChange={(e) => setForm((f) => ({ ...f, staff: e.target.value }))} className={inputCls}>
+                {STAFF.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {conflict && (
+            <p className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {conflict}
+            </p>
+          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <button
+            onClick={add}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" aria-hidden /> Add slot
+          </button>
+        </div>
+      </Card>
     </div>
   )
 }

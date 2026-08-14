@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { GraduationCap, Users, ShieldCheck, ArrowRight, Fingerprint, Building2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { ROLE_META, type Role } from "@/lib/mock-data"
@@ -42,9 +43,9 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
       {/* Brand panel */}
-      <section className="relative flex flex-col justify-between overflow-hidden bg-sidebar px-8 py-10 text-sidebar-foreground lg:w-[44%] lg:px-14 lg:py-14">
+      <section className="relative flex flex-col justify-between overflow-hidden border-b border-border bg-card px-8 py-10 lg:w-[44%] lg:border-b-0 lg:border-r lg:px-14 lg:py-14">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="h-5 w-5" aria-hidden />
           </div>
           <span className="text-lg font-bold tracking-tight">FlowDesk</span>
@@ -54,7 +55,7 @@ export default function LoginPage() {
           <h1 className="text-balance text-3xl font-bold leading-tight tracking-tight lg:text-4xl">
             One platform for your entire campus.
           </h1>
-          <p className="mt-4 text-pretty text-sm leading-relaxed text-sidebar-foreground/70">
+          <p className="mt-4 text-pretty text-sm leading-relaxed text-muted-foreground">
             Biometric check-in, notifications, mentor guidance and module routines — unified for students, staff and
             administrators.
           </p>
@@ -65,9 +66,9 @@ export default function LoginPage() {
               { icon: Users, text: "Role-aware dashboards for every member" },
               { icon: ShieldCheck, text: "Real-time attendance and alerts" },
             ].map((item) => (
-              <li key={item.text} className="flex items-center gap-3 text-sm text-sidebar-foreground/85">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-accent">
-                  <item.icon className="h-4 w-4 text-sidebar-primary" aria-hidden />
+              <li key={item.text} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
+                  <item.icon className="h-4 w-4 text-primary" aria-hidden />
                 </span>
                 {item.text}
               </li>
@@ -75,14 +76,14 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative z-10 font-mono text-xs text-sidebar-foreground/50">
+        <p className="relative z-10 font-mono text-xs text-muted-foreground">
           Frontend demo — credentials are pre-filled, any password works.
         </p>
 
         {/* subtle grid decoration */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          className="pointer-events-none absolute inset-0 opacity-[0.05]"
           style={{
             backgroundImage:
               "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
@@ -201,6 +202,13 @@ export default function LoginPage() {
               </p>
             </div>
           )}
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            New to the campus?{" "}
+            <Link href="/apply" className="font-semibold text-primary hover:underline">
+              Apply for admission
+            </Link>
+          </p>
         </div>
       </section>
     </main>
