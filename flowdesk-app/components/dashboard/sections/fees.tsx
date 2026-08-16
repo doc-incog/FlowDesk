@@ -1,13 +1,26 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BadgeCheck, Banknote, CheckCircle2, Download, Landmark, Lock, Receipt as ReceiptIcon, Smartphone, Wallet, CreditCard } from "lucide-react"
+import { AlertCircle, BadgeCheck, Banknote, CheckCircle2, Download, Landmark, Lock, Receipt as ReceiptIcon, Smartphone, Wallet, CreditCard } from "lucide-react"
 import type { UserProfile } from "@/lib/seed-data/core"
-import { downloadHtml } from "@/lib/download"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { Modal } from "@/components/ui/modal"
 import { cn } from "@/lib/utils"
+
+async function downloadReceipt(id: string) {
+  const res = await fetch(`/api/receipts/${id}/pdf`)
+  if (!res.ok) return
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `receipt-${id}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 type PaymentMethod = "upi" | "card" | "netbanking" | "cash"
 
@@ -66,6 +79,7 @@ export function FeesSection() {
   const [step, setStep] = useState<"method" | "processing" | "success">("method")
   const [method, setMethod] = useState<PaymentMethod>("upi")
   const [newReceipt, setNewReceipt] = useState<Receipt | null>(null)
+  const [payError, setPayError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -104,44 +118,42 @@ export function FeesSection() {
     setMethod("upi")
     setStep("method")
     setNewReceipt(null)
+    setPayError(null)
   }
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!paying) return
     setStep("processing")
-    setTimeout(() => {
-      const receipt: Receipt = {
-        id: `RCP-${Math.floor(7002 + Math.random() * 900)}`,
-        studentId: me.id,
-        studentName: me.name,
-        itemName: paying.name,
-        amount: paying.amount,
-        date: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-        method,
-        transactionId: `TXN-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
-      }
+    setPayError(null)
+    try {
+      const res = await fetch(`/api/fees/${paying.id}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.receipt) throw new Error(data.error ?? "Payment failed")
+      const receipt = data.receipt as Receipt
       setFees((prev) =>
         (prev ?? []).map((f) =>
           f.id === paying.id
-            ? {
-                ...f,
-                status: "paid",
-                paidDate: receipt.date,
-                method: receipt.method,
-                receiptId: receipt.id,
-              }
+            ? { ...f, status: "paid", paidDate: receipt.date, method: receipt.method, receiptId: receipt.id }
             : f,
         ),
       )
       setReceipts((prev) => [receipt, ...(prev ?? [])])
       setNewReceipt(receipt)
       setStep("success")
-    }, 1800)
+    } catch (err) {
+      setStep("method")
+      setPayError(err instanceof Error ? err.message : "Payment failed")
+    }
   }
 
   const closeModal = () => {
     setPaying(null)
     setNewReceipt(null)
+    setPayError(null)
   }
 
   return (
@@ -241,6 +253,12 @@ export function FeesSection() {
             <div className="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
               This is a simulated payment — no real money is moved. The receipt is generated instantly.
             </div>
+            {payError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <span>{payError}</span>
+              </div>
+            )}
             <button
               onClick={confirm}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
@@ -283,29 +301,7 @@ export function FeesSection() {
             </div>
             <button
               onClick={() => {
-                const body = `
-                  <div class="head">
-                    <div>
-                      <h1>FlowDesk — Fee Receipt</h1>
-                      <p class="muted">${newReceipt.date}</p>
-                    </div>
-                    <span class="badge">PAID</span>
-                  </div>
-                  <div class="grid">
-                    <div><p class="muted">Receipt No</p><b>${newReceipt.id}</b></div>
-                    <div><p class="muted">Student</p><b>${newReceipt.studentName}</b></div>
-                    <div><p class="muted">Roll No</p><b>${newReceipt.studentId}</b></div>
-                    <div><p class="muted">Transaction</p><b>${newReceipt.transactionId}</b></div>
-                  </div>
-                  <table>
-                    <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
-                    <tbody>
-                      <tr><td>${newReceipt.itemName}</td><td class="right">${formatINR(newReceipt.amount)}</td></tr>
-                      <tr class="total"><td>Total paid via ${METHOD_LABEL[newReceipt.method]}</td><td class="right">${formatINR(newReceipt.amount)}</td></tr>
-                    </tbody>
-                  </table>
-                  <p class="note">This is a digitally generated receipt from FlowDesk for the transaction above. No physical copy is required.</p>`
-                downloadHtml(`receipt-${newReceipt.id}.html`, "Fee Receipt", body)
+                downloadReceipt(newReceipt.id)
                 closeModal()
               }}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
@@ -339,31 +335,7 @@ function ReceiptsList({ receipts }: { receipts: Receipt[] }) {
               {METHOD_LABEL[r.method]}
             </span>
             <button
-              onClick={() => {
-                const body = `
-                  <div class="head">
-                    <div>
-                      <h1>FlowDesk — Fee Receipt</h1>
-                      <p class="muted">${r.date}</p>
-                    </div>
-                    <span class="badge">PAID</span>
-                  </div>
-                  <div class="grid">
-                    <div><p class="muted">Receipt No</p><b>${r.id}</b></div>
-                    <div><p class="muted">Student</p><b>${r.studentName}</b></div>
-                    <div><p class="muted">Roll No</p><b>${r.studentId}</b></div>
-                    <div><p class="muted">Transaction</p><b>${r.transactionId}</b></div>
-                  </div>
-                  <table>
-                    <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
-                    <tbody>
-                      <tr><td>${r.itemName}</td><td class="right">${formatINR(r.amount)}</td></tr>
-                      <tr class="total"><td>Total paid via ${METHOD_LABEL[r.method]}</td><td class="right">${formatINR(r.amount)}</td></tr>
-                    </tbody>
-                  </table>
-                  <p class="note">This is a digitally generated receipt from FlowDesk for the transaction above. No physical copy is required.</p>`
-                downloadHtml(`receipt-${r.id}.html`, "Fee Receipt", body)
-              }}
+              onClick={() => downloadReceipt(r.id)}
               aria-label={`Download receipt ${r.id}`}
               className="rounded-sm border border-border p-2 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
             >

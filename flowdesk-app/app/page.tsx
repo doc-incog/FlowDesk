@@ -10,8 +10,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 export default function LoginPage() {
   const router = useRouter()
   const { user, ready, login } = useAuth()
-  const [email, setEmail] = useState("aisha.karim@campus.edu")
-  const [password, setPassword] = useState("campus123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 

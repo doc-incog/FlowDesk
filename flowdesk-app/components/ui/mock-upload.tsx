@@ -9,7 +9,7 @@ export function MockFileUpload({
   className,
 }: {
   label?: string
-  onSelect: (name: string) => void
+  onSelect: (file: File | null) => void
   className?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -22,10 +22,10 @@ export function MockFileUpload({
         type="file"
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0]
+          const f = e.target.files?.[0] ?? null
           if (f) {
             setName(f.name)
-            onSelect(f.name)
+            onSelect(f)
           }
         }}
       />
@@ -36,7 +36,7 @@ export function MockFileUpload({
             type="button"
             onClick={() => {
               setName("")
-              onSelect("")
+              onSelect(null)
               if (inputRef.current) inputRef.current.value = ""
             }}
             aria-label="Remove file"

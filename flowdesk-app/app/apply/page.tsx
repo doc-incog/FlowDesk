@@ -262,11 +262,11 @@ export default function ApplyPage() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <MockFileUpload
                         label="Attach marksheet"
-                        onSelect={(name) => setForm((f) => ({ ...f, docs: [...f.docs, name] }))}
+                        onSelect={(file) => file && setForm((f) => ({ ...f, docs: [...f.docs, file.name] }))}
                       />
                       <MockFileUpload
                         label="Attach ID proof (optional)"
-                        onSelect={(name) => setForm((f) => ({ ...f, docs: [...f.docs, name] }))}
+                        onSelect={(file) => file && setForm((f) => ({ ...f, docs: [...f.docs, file.name] }))}
                       />
                     </div>
                     {form.docs.length > 0 && (

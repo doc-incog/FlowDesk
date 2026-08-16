@@ -169,7 +169,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Supporting documents</label>
-              <MockFileUpload label="Attach transcript, certificate or income proof" onSelect={(name) => setDocNames((d) => [...d, name])} />
+              <MockFileUpload label="Attach transcript, certificate or income proof" onSelect={(file) => file && setDocNames((d) => [...d, file.name])} />
             </div>
             <button
               onClick={submitApplication}

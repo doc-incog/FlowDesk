@@ -77,18 +77,12 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
                 <p className="text-lg font-bold text-success">You&apos;re checked in</p>
                 <p className="mt-1 font-mono text-sm text-muted-foreground">{userName} · {nowTime()}</p>
               </div>
-              <button
-                onClick={() => setCheckedIn(false)}
-                className="rounded-sm border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
-              >
-                Reset demo
-              </button>
             </div>
           ) : (
             <>
               <BiometricScanner label="Tap to check in" onVerified={handleVerified} />
               <p className="max-w-xs text-center text-xs text-muted-foreground">
-                Your fingerprint template never leaves the device — only a pass/fail signal is recorded.
+                Demo simulation: your fingerprint template never leaves the device — only a pass/fail signal is recorded.
               </p>
             </>
           )}

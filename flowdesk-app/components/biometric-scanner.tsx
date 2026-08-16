@@ -150,7 +150,7 @@ export function BiometricScanner({ onVerified, label = "Scan fingerprint to cont
         </p>
         {state === "success" && (
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-            via {method === "webauthn" ? "WebAuthn platform authenticator" : "biometric sensor"}
+            via {method === "webauthn" ? "WebAuthn platform authenticator" : "demo simulation — biometric sensor"}
           </p>
         )}
       </div>

@@ -129,25 +129,29 @@ function MyTasks({
   me: UserProfile
 }) {
   const [uploadFor, setUploadFor] = useState<Assignment | null>(null)
-  const [fileName, setFileName] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const submit = () => {
-    if (!uploadFor || !fileName) return
-    setSubmissions((prev) => [
-      {
-        id: `SU${Date.now()}`,
-        assignmentId: uploadFor.id,
-        studentId: me.id,
-        studentName: me.name,
-        submittedAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-        fileName,
-        marks: null,
-        feedback: "",
-      },
-      ...prev,
-    ])
-    setFileName("")
-    setUploadFor(null)
+  const submit = async () => {
+    if (!uploadFor || !file) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const form = new FormData()
+      form.append("assignmentId", uploadFor.id)
+      form.append("file", file)
+      const res = await fetch("/api/submissions", { method: "POST", body: form })
+      const data = await res.json()
+      if (!res.ok || !data.submission) throw new Error(data.error ?? "Upload failed")
+      setSubmissions((prev) => [data.submission, ...prev])
+      setFile(null)
+      setUploadFor(null)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const items = assignments.map((a) => {
@@ -226,13 +230,14 @@ function MyTasks({
           <p className="text-sm text-muted-foreground">
             Attach your solution for {uploadFor?.moduleName}. Deadline: {uploadFor?.dueDate}.
           </p>
-          <MockFileUpload label="Attach solution file" onSelect={setFileName} />
+          <MockFileUpload label="Attach solution file" onSelect={setFile} />
+          {submitError && <p className="text-sm text-destructive">{submitError}</p>}
           <button
             onClick={submit}
-            disabled={!fileName}
+            disabled={!file || submitting}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            <CheckCircle2 className="h-4 w-4" aria-hidden /> Submit assignment
+            <CheckCircle2 className="h-4 w-4" aria-hidden /> {submitting ? "Uploading…" : "Submit assignment"}
           </button>
         </div>
       </Modal>

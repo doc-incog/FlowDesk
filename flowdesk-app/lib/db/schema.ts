@@ -119,6 +119,7 @@ export function createSchema(db: DatabaseSync) {
       student_name TEXT NOT NULL,
       submitted_at TEXT NOT NULL,
       file_name TEXT NOT NULL,
+      file_path TEXT,
       marks INTEGER,
       feedback TEXT NOT NULL DEFAULT ''
     );

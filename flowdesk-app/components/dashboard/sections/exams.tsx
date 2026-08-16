@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { CalendarDays, Check, Clock, Download, MapPin, Plus, Trash2, TrendingUp } from "lucide-react"
 import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
-import { downloadHtml } from "@/lib/download"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -292,35 +291,33 @@ function ReportCardView({ student, exams, results }: { student: UserProfile; exa
   const totalMax = rows.reduce((s, r) => s + r.max, 0)
   const overall = percentage(totalMarks, totalMax)
 
-  const download = () => {
-    const body = `
-    <div class="head">
-      <div>
-        <h1>FlowDesk — Digital Report Card</h1>
-        <p class="muted">Semester 5 · Academic Year 2025–26</p>
-      </div>
-      <span class="badge">${gradeFor(overall)}</span>
-    </div>
-    <div class="grid">
-      <div><p class="muted">Student</p><b>${student.name}</b></div>
-      <div><p class="muted">Roll No</p><b>${student.rollNo}</b></div>
-      <div><p class="muted">Department</p><b>${student.department}</b></div>
-      <div><p class="muted">Semester</p><b>${student.semester}</b></div>
-    </div>
-    <table>
-      <thead><tr><th>Exam</th><th>Module</th><th class="right">Max</th><th class="right">Marks</th><th class="right">%</th><th class="right">Grade</th></tr></thead>
-      <tbody>
-        ${rows
-          .map(
-            (r) =>
-              `<tr><td>${r.exam.title}</td><td>${r.exam.moduleCode}</td><td class="right">${r.max}</td><td class="right">${r.marks}</td><td class="right">${r.pct}</td><td class="right"><span class="badge">${r.grade}</span></td></tr>`,
-          )
-          .join("")}
-        <tr class="total"><td colspan="2">Total</td><td class="right">${totalMax}</td><td class="right">${totalMarks}</td><td class="right">${overall}%</td><td class="right">${gradeFor(overall)}</td></tr>
-      </tbody>
-    </table>
-    <p class="note">This is a digitally generated report card from FlowDesk. Marks are auto-calculated from entered examination results.</p>`
-    downloadHtml(`report-card-${student.id}.html`, "Report Card", body)
+  const download = async () => {
+    const res = await fetch("/api/exams/report-card", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentName: student.name,
+        studentId: student.id,
+        rollNo: student.rollNo,
+        department: student.department,
+        semester: student.semester,
+        rows,
+        totalMax,
+        totalMarks,
+        overall,
+        grade: gradeFor(overall),
+      }),
+    })
+    if (!res.ok) return
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `report-card-${student.id}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   return (
