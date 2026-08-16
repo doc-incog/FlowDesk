@@ -1,36 +1,30 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Save } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 
 export function ProfileSection() {
   const { user, refreshUser } = useAuth()
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [subjects, setSubjects] = useState("")
+  const [form, setForm] = useState<Record<string, string>>(() => ({
+    name: user?.name ?? "",
+    email: user?.email ?? "",
+    avatarInitials: user?.avatarInitials ?? "",
+    department: user?.department ?? "",
+    phone: user?.phone ?? "",
+    address: user?.address ?? "",
+    dob: user?.dob ?? "",
+    rollNo: user?.rollNo ?? "",
+    semester: user?.semester ?? "",
+    batch: user?.batch ?? "",
+    mentorId: user?.mentorId ?? "",
+    designation: user?.designation ?? "",
+  }))
+  const [subjects, setSubjects] = useState(() => user?.subjects?.join(", ") ?? "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!user) return
-    setForm({
-      name: user.name,
-      email: user.email,
-      avatarInitials: user.avatarInitials,
-      department: user.department,
-      phone: user.phone ?? "",
-      address: user.address ?? "",
-      dob: user.dob ?? "",
-      rollNo: user.rollNo ?? "",
-      semester: user.semester ?? "",
-      batch: user.batch ?? "",
-      mentorId: user.mentorId ?? "",
-      designation: user.designation ?? "",
-    })
-    setSubjects(user.subjects?.join(", ") ?? "")
-  }, [user])
 
   if (!user) return <p className="text-sm text-muted-foreground">Loading…</p>
 

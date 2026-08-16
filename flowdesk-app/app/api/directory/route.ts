@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { getDb, mapUser } from "@/lib/db"
 import { hashPassword } from "@/lib/db/password"
-import { DEFAULT_PASSWORD } from "@/lib/seed-data/core"
+import { DEFAULT_PASSWORD } from "@/lib/constants"
 
 export const runtime = "nodejs"
 

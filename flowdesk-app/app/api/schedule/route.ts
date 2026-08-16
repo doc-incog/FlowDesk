@@ -4,10 +4,6 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
-function overlaps(a: { start: string; end: string }, b: { start: string; end: string }) {
-  return a.start < b.end && b.start < a.end
-}
-
 export async function GET() {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

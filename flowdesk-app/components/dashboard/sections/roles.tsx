@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, Save, Search, ShieldCheck, Trash2 } from "lucide-react"
 import type { UserProfile } from "@/lib/seed-data/core"
-import { SECTION_KEYS } from "@/lib/seed-data/core"
+import { SECTION_KEYS } from "@/lib/constants"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -176,7 +176,7 @@ function RoleForm({
   const [key, setKey] = useState(initial?.key ?? "")
   const [label, setLabel] = useState(initial?.label ?? "")
   const [blurb, setBlurb] = useState(initial?.blurb ?? "")
-  const [accent, setAccent] = useState(initial?.accent ?? "chart-5")
+  const accent = initial?.accent ?? "chart-5"
   const [sections, setSections] = useState<Set<string>>(new Set(initial?.sections ?? []))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -297,7 +297,7 @@ function OverridesTab() {
   const [people, setPeople] = useState<UserProfile[] | null>(null)
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [perms, setPerms] = useState<{ defaults: string[]; override: string[] | null } | null>(null)
+  const [permState, setPermState] = useState<{ userId: string; defaults: string[]; override: string[] | null } | null>(null)
   const [custom, setCustom] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -320,10 +320,7 @@ function OverridesTab() {
   }, [])
 
   useEffect(() => {
-    if (!selectedId) {
-      setPerms(null)
-      return
-    }
+    if (!selectedId) return
     let alive = true
     fetch(`/api/permissions?userId=${encodeURIComponent(selectedId)}`)
       .then((r) => r.json())
@@ -333,7 +330,7 @@ function OverridesTab() {
           setError(d.error)
           return
         }
-        setPerms({ defaults: d.defaults ?? [], override: d.override ?? null })
+        setPermState({ userId: selectedId, defaults: d.defaults ?? [], override: d.override ?? null })
         setCustom(new Set(d.override ?? d.defaults ?? []))
         setSaved(false)
       })
@@ -342,6 +339,8 @@ function OverridesTab() {
       alive = false
     }
   }, [selectedId])
+
+  const perms = permState?.userId === selectedId ? permState : null
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -365,7 +364,7 @@ function OverridesTab() {
         setError(data?.error ?? "Could not save permissions.")
         return
       }
-      setPerms((prev) => ({ defaults: prev?.defaults ?? [], override: data.override ?? null }))
+      setPermState((prev) => ({ userId: selectedId, defaults: prev?.defaults ?? [], override: data.override ?? null }))
       setSaved(true)
     } catch {
       setError("Network error while saving permissions.")
@@ -423,7 +422,7 @@ function OverridesTab() {
                 aria-checked={perms.override === null}
                 onClick={() => {
                   const useDefaults = perms.override !== null
-                  setPerms({ defaults: perms.defaults, override: useDefaults ? null : [...perms.defaults] })
+                  setPermState({ userId: perms.userId, defaults: perms.defaults, override: useDefaults ? null : [...perms.defaults] })
                   setCustom(new Set(perms.defaults))
                 }}
                 className={cn(

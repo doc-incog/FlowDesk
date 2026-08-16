@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import { roleSections } from "@/lib/permissions"
-import { SECTION_KEYS } from "@/lib/seed-data/core"
+import { SECTION_KEYS } from "@/lib/constants"
 
 export const runtime = "nodejs"
 
@@ -82,7 +82,7 @@ export async function PATCH(
       }
     }
     db.exec("COMMIT")
-  } catch (err) {
+  } catch {
     db.exec("ROLLBACK")
     return NextResponse.json({ error: "Could not update role" }, { status: 500 })
   }

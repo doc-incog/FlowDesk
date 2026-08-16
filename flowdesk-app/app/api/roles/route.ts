@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import { roleSections } from "@/lib/permissions"
-import { SECTION_KEYS } from "@/lib/seed-data/core"
+import { SECTION_KEYS } from "@/lib/constants"
 
 export const runtime = "nodejs"
 
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       db.prepare("INSERT INTO role_permissions (role, section) VALUES (?, ?)").run(key, section)
     }
     db.exec("COMMIT")
-  } catch (err) {
+  } catch {
     db.exec("ROLLBACK")
     return NextResponse.json({ error: "Could not create role" }, { status: 500 })
   }

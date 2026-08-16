@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { findUserById, getDb, mapUser } from "@/lib/db"
 import { roleSections, userOverrideSections } from "@/lib/permissions"
-import { SECTION_KEYS } from "@/lib/seed-data/core"
+import { SECTION_KEYS } from "@/lib/constants"
 
 export const runtime = "nodejs"
 
