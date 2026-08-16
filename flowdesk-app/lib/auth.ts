@@ -5,7 +5,7 @@ import { getDb, mapUser, findUserById } from "@/lib/db"
 export const SESSION_COOKIE = "flowdesk.session"
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(userId: string, opts?: { secure?: boolean }): Promise<string> {
   const token = randomBytes(32).toString("hex")
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS)
   getDb()
@@ -16,7 +16,7 @@ export async function createSession(userId: string): Promise<string> {
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: opts?.secure ?? process.env.NODE_ENV === "production",
     path: "/",
     expires: expiresAt,
   })

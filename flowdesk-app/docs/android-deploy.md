@@ -181,6 +181,7 @@ then `scp` the tar again and extract on the phone (Part C/Part D).
 | `node:sqlite` throws `ERR_UNKNOWN_BUILTIN_MODULE` | Termux's Node lacks the bundled SQLite. Install build tools and swap to `better-sqlite3`: `pkg install clang make python binutils`, then `pnpm remove` nothing — update `lib/db/*` imports (documented separately). |
 | Server dies when screen locks | Wake lock missing, or MIUI battery optimisation active (Part F). |
 | `http://<phone-ip>:3000` times out from PC | Phone and PC on different Wi-Fi / AP isolation enabled; test `localhost:3000` on the phone first. |
+| Login works but every page/API returns 401 | Stale bundle: the session cookie's `Secure` flag was previously unconditional in production. Re-transfer the current bundle (which makes it scheme-aware) and restart. |
 | Tunnel URL not loading | The tunnel process was killed by the OS — restart `cloudflared`/`ssh` inside an active Termux session (Part E). |
 | Out of memory | 4 GB is enough for this app; if the OS kills Node under load, reduce concurrency (`NODE_OPTIONS=--max-old-space-size=1024`) and keep the phone cool. |
 

@@ -26,7 +26,10 @@ export async function POST(request: Request) {
   }
 
   purgeExpiredSessions()
-  await createSession(user.id)
+  const proto = request.headers.get("x-forwarded-proto")
+  const cfVisitor = request.headers.get("cf-visitor") ?? ""
+  const secure = proto === "https" || cfVisitor.includes('"https"')
+  await createSession(user.id, { secure })
 
   return NextResponse.json({ user: withPermissions(mapUser(user)) })
 }
