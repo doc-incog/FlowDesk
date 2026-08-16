@@ -82,9 +82,9 @@ export function AssignmentsSection({ role }: { role: Role }) {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!assignments || !submissions || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!assignments || !submissions || !me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const setSubmissionsSafe: React.Dispatch<React.SetStateAction<Submission[]>> = (updater) =>
     setSubmissions((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
@@ -231,7 +231,7 @@ function MyTasks({
             Attach your solution for {uploadFor?.moduleName}. Deadline: {uploadFor?.dueDate}.
           </p>
           <MockFileUpload label="Attach solution file" onSelect={setFile} />
-          {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+          {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
           <button
             onClick={submit}
             disabled={!file || submitting}
@@ -288,8 +288,9 @@ function GradeSubmissions({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">Assignment:</span>
+        <label htmlFor="asg-assignment" className="text-sm font-medium">Assignment:</label>
         <select
+          id="asg-assignment"
           value={assignmentId}
           onChange={(e) => setAssignmentId(e.target.value)}
           className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
@@ -322,12 +323,14 @@ function GradeSubmissions({
                   placeholder="Marks"
                   defaultValue={sub.marks ?? ""}
                   onChange={(e) => setMarks((m) => ({ ...m, [sub.id]: e.target.value }))}
+                  aria-label={`Marks for ${sub.studentName}`}
                   className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-primary"
                 />
                 <input
                   placeholder="Feedback"
                   defaultValue={sub.feedback}
                   onChange={(e) => setFeedback((f) => ({ ...f, [sub.id]: e.target.value }))}
+                  aria-label={`Feedback for ${sub.studentName}`}
                   className="w-40 rounded-sm border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-primary"
                 />
                 <button
@@ -395,8 +398,9 @@ function ManageAssignments({
         <SectionHeading title="Create assignment" />
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Module</label>
+            <label htmlFor="asg-module" className="text-sm font-medium">Module</label>
             <select
+              id="asg-module"
               value={form.moduleCode}
               onChange={(e) => {
                 const m = modules.find(([code]) => code === e.target.value)
@@ -413,12 +417,13 @@ function ManageAssignments({
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Title</label>
-            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={inputCls} />
+            <label htmlFor="asg-title" className="text-sm font-medium">Title</label>
+            <input id="asg-title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={inputCls} />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Description</label>
+            <label htmlFor="asg-description" className="text-sm font-medium">Description</label>
             <textarea
+              id="asg-description"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               rows={3}
@@ -427,15 +432,15 @@ function ManageAssignments({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Due date</label>
-              <input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className={inputCls} />
+              <label htmlFor="asg-due" className="text-sm font-medium">Due date</label>
+              <input id="asg-due" type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Max marks</label>
-              <input type="number" value={form.maxMarks} onChange={(e) => setForm((f) => ({ ...f, maxMarks: Number(e.target.value) }))} className={inputCls} />
+              <label htmlFor="asg-maxmarks" className="text-sm font-medium">Max marks</label>
+              <input id="asg-maxmarks" type="number" value={form.maxMarks} onChange={(e) => setForm((f) => ({ ...f, maxMarks: Number(e.target.value) }))} className={inputCls} />
             </div>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"

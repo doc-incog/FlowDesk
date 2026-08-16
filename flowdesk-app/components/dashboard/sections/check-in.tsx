@@ -15,6 +15,8 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
   const [checkedIn, setCheckedIn] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [checkinError, setCheckinError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -33,8 +35,9 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
   }, [])
 
   const handleVerified = async (method: "webauthn" | "biometric") => {
-    if (checkedIn) return
-    setCheckedIn(true)
+    if (checkedIn || busy) return
+    setBusy(true)
+    setCheckinError(null)
     try {
       const res = await fetch("/api/checkins", {
         method: "POST",
@@ -42,18 +45,21 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
         body: JSON.stringify({ method }),
       })
       const data = await res.json()
-      if (data?.record) {
-        setRecords((prev) => [data.record, ...prev])
-      } else if (data?.error) {
-        setError(data.error)
+      if (data?.record || data?.alreadyCheckedIn) {
+        setCheckedIn(true)
+        if (data?.record) setRecords((prev) => [data.record, ...prev])
+      } else {
+        setCheckinError(data?.error ?? "Check-in failed")
       }
     } catch {
-      setError("Check-in failed")
+      setCheckinError("Check-in failed")
+    } finally {
+      setBusy(false)
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
 
   const present = records.filter((r) => r.status !== "absent").length
   const late = records.filter((r) => r.status === "late").length
@@ -69,7 +75,7 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
         {/* Scanner */}
         <Card className="flex flex-col items-center justify-center gap-6 py-10 lg:col-span-2">
           {checkedIn ? (
-            <div className="flex flex-col items-center gap-4 text-center">
+            <div role="status" className="flex flex-col items-center gap-4 text-center">
               <span className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-success bg-success/10">
                 <CheckCircle2 className="h-14 w-14 text-success" aria-hidden />
               </span>
@@ -80,6 +86,11 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
             </div>
           ) : (
             <>
+              {checkinError && (
+                <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {checkinError}
+                </p>
+              )}
               <BiometricScanner label="Tap to check in" onVerified={handleVerified} />
               <p className="max-w-xs text-center text-xs text-muted-foreground">
                 Demo simulation: your fingerprint template never leaves the device — only a pass/fail signal is recorded.
@@ -152,15 +163,21 @@ export function CheckInSection({ userName }: { role: Role; userName: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {records.map((r) => (
-                <tr key={r.id}>
-                  <td className="py-2.5 font-medium">{r.name}</td>
-                  <td className="py-2.5"><RoleBadge role={r.role} /></td>
-                  <td className="py-2.5 font-mono text-muted-foreground">{r.time}</td>
-                  <td className="py-2.5 capitalize text-muted-foreground">{r.method}</td>
-                  <td className="py-2.5 text-right"><StatusBadge status={r.status} /></td>
+              {records.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-2.5 text-center text-muted-foreground">No check-ins for this date yet.</td>
                 </tr>
-              ))}
+              ) : (
+                records.map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-2.5 font-medium">{r.name}</td>
+                    <td className="py-2.5"><RoleBadge role={r.role} /></td>
+                    <td className="py-2.5 font-mono text-muted-foreground">{r.time}</td>
+                    <td className="py-2.5 capitalize text-muted-foreground">{r.method}</td>
+                    <td className="py-2.5 text-right"><StatusBadge status={r.status} /></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

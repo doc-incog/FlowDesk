@@ -111,6 +111,7 @@ export function BiometricScanner({ onVerified, label = "Scan fingerprint to cont
         onClick={state === "success" ? reset : runWebAuthn}
         disabled={isBusy}
         aria-label={label}
+        aria-busy={isBusy || undefined}
         className={cn(
           "group relative flex h-32 w-32 items-center justify-center rounded-full border-2 transition-colors",
           state === "idle" && "border-border bg-secondary hover:border-primary",
@@ -139,6 +140,8 @@ export function BiometricScanner({ onVerified, label = "Scan fingerprint to cont
 
       <div className="min-h-10 text-center">
         <p
+          role="status"
+          aria-live="polite"
           className={cn(
             "text-sm font-medium",
             state === "success" && "text-success",

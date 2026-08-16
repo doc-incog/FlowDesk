@@ -135,9 +135,9 @@ export function ExamsSection({ role }: { role: Role }) {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!exams || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!exams || !me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const setExamsSafe: React.Dispatch<React.SetStateAction<Exam[]>> = (updater) =>
     setExams((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
@@ -189,7 +189,7 @@ function ExamSchedule({ exams }: { exams: Exam[] }) {
 function Row({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <p className="flex items-center gap-2 text-muted-foreground">
-      {icon} {label}
+      <span aria-hidden>{icon}</span> {label}
     </p>
   )
 }
@@ -208,6 +208,7 @@ function SeatingView({ exams, students, me }: { exams: Exam[]; students: UserPro
             <button
               key={ex.id}
               onClick={() => setExamId(ex.id)}
+              aria-pressed={examId === ex.id}
               className={cn(
                 "flex w-full items-center justify-between rounded-sm border px-3 py-2 text-left text-sm transition-colors",
                 examId === ex.id ? "border-primary bg-primary/[0.04]" : "border-border hover:bg-secondary",
@@ -406,8 +407,9 @@ function AllResults({ exams, results, students }: { exams: Exam[]; results: Resu
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">Student:</span>
+        <label htmlFor="exam-student" className="text-sm font-medium">Student:</label>
         <select
+          id="exam-student"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
           className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
@@ -467,8 +469,9 @@ function MarkEntry({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">Exam:</span>
+        <label htmlFor="exam-select" className="text-sm font-medium">Exam:</label>
         <select
+          id="exam-select"
           value={examId}
           onChange={(e) => selectExam(e.target.value)}
           className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
@@ -507,6 +510,7 @@ function MarkEntry({
                       max={exam?.maxMarks ?? 0}
                       value={marks[s.id] ?? ""}
                       onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: Number(e.target.value) }))}
+                      aria-label={`Marks for ${s.name}`}
                       className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 text-right font-mono text-sm outline-none focus:border-primary"
                     />
                   </td>
@@ -527,7 +531,7 @@ function MarkEntry({
         >
           <Check className="h-4 w-4" aria-hidden /> Save marks
         </button>
-        {saved && <span className="text-sm font-medium text-success">Marks saved — grades updated on report cards.</span>}
+        {saved && <span role="status" className="text-sm font-medium text-success">Marks saved — grades updated on report cards.</span>}
       </div>
     </div>
   )
@@ -588,8 +592,9 @@ function ManageExams({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Module</label>
+              <label htmlFor="exam-module" className="text-sm font-medium">Module</label>
               <select
+                id="exam-module"
                 value={form.moduleCode}
                 onChange={(e) => {
                   const m = modules.find(([code]) => code === e.target.value)
@@ -610,8 +615,9 @@ function ManageExams({
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Type</label>
+              <label htmlFor="exam-type" className="text-sm font-medium">Type</label>
               <select
+                id="exam-type"
                 value={form.type}
                 onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as ExamType }))}
                 className={inputCls}
@@ -624,29 +630,29 @@ function ManageExams({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Date</label>
-              <input value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} placeholder="28 Jun 2026" className={inputCls} />
+              <label htmlFor="exam-date" className="text-sm font-medium">Date</label>
+              <input id="exam-date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} placeholder="28 Jun 2026" className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Room</label>
-              <input value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />
+              <label htmlFor="exam-room" className="text-sm font-medium">Room</label>
+              <input id="exam-room" value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Start</label>
-              <input value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} className={inputCls} />
+              <label htmlFor="exam-start" className="text-sm font-medium">Start</label>
+              <input id="exam-start" value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">End</label>
-              <input value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
+              <label htmlFor="exam-end" className="text-sm font-medium">End</label>
+              <input id="exam-end" value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Max marks</label>
-              <input type="number" value={form.maxMarks} onChange={(e) => setForm((f) => ({ ...f, maxMarks: Number(e.target.value) }))} className={inputCls} />
+              <label htmlFor="exam-maxmarks" className="text-sm font-medium">Max marks</label>
+              <input id="exam-maxmarks" type="number" value={form.maxMarks} onChange={(e) => setForm((f) => ({ ...f, maxMarks: Number(e.target.value) }))} className={inputCls} />
             </div>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"

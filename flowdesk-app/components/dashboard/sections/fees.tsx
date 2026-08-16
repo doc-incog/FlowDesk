@@ -104,9 +104,9 @@ export function FeesSection() {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!fees || !receipts || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!fees || !receipts || !me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const pending = fees.filter((f) => f.status === "pending")
   const paid = fees.filter((f) => f.status === "paid")
@@ -184,34 +184,40 @@ export function FeesSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {fees.map((f) => (
-                <tr key={f.id}>
-                  <td className="py-3 font-medium">{f.name}</td>
-                  <td className="py-3 text-right font-mono font-semibold">{formatINR(f.amount)}</td>
-                  <td className="py-3 text-muted-foreground">{f.dueDate}</td>
-                  <td className="py-3">
-                    {f.status === "paid" ? (
-                      <span className="pill bg-success/10 text-success">
-                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Paid · {METHOD_LABEL[f.method ?? "upi"]}
-                      </span>
-                    ) : (
-                      <span className="pill bg-warning/15 text-warning">Pending</span>
-                    )}
-                  </td>
-                  <td className="py-3 text-right">
-                    {f.status === "paid" ? (
-                      <span className="font-mono text-xs text-muted-foreground">{f.receiptId}</span>
-                    ) : (
-                      <button
-                        onClick={() => startPay(f)}
-                        className="rounded-sm bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                      >
-                        Pay now
-                      </button>
-                    )}
-                  </td>
+              {fees.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-3 text-center text-muted-foreground">No fee items for your account.</td>
                 </tr>
-              ))}
+              ) : (
+                fees.map((f) => (
+                  <tr key={f.id}>
+                    <td className="py-3 font-medium">{f.name}</td>
+                    <td className="py-3 text-right font-mono font-semibold">{formatINR(f.amount)}</td>
+                    <td className="py-3 text-muted-foreground">{f.dueDate}</td>
+                    <td className="py-3">
+                      {f.status === "paid" ? (
+                        <span className="pill bg-success/10 text-success">
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Paid · {METHOD_LABEL[f.method ?? "upi"]}
+                        </span>
+                      ) : (
+                        <span className="pill bg-warning/15 text-warning">Pending</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-right">
+                      {f.status === "paid" ? (
+                        <span className="font-mono text-xs text-muted-foreground">{f.receiptId}</span>
+                      ) : (
+                        <button
+                          onClick={() => startPay(f)}
+                          className="rounded-sm bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                        >
+                          Pay now
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </Card>
@@ -233,11 +239,13 @@ export function FeesSection() {
               </div>
               <Lock className="h-5 w-5 text-muted-foreground" aria-hidden />
             </div>
-            <div className="space-y-2">
+            <div role="radiogroup" aria-label="Select payment method" className="space-y-2">
               <p className="text-sm font-semibold">Choose payment method</p>
               {METHODS.map((m) => (
                 <button
                   key={m.id}
+                  role="radio"
+                  aria-checked={method === m.id}
                   onClick={() => setMethod(m.id)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-md border px-4 py-3 text-sm font-medium transition-colors",
@@ -254,7 +262,7 @@ export function FeesSection() {
               This is a simulated payment — no real money is moved. The receipt is generated instantly.
             </div>
             {payError && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 <span>{payError}</span>
               </div>
@@ -282,7 +290,7 @@ export function FeesSection() {
         )}
 
         {step === "success" && newReceipt && (
-          <div className="space-y-5">
+          <div role="status" className="space-y-5">
             <div className="flex flex-col items-center gap-3 py-2 text-center">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
                 <CheckCircle2 className="h-8 w-8" aria-hidden />

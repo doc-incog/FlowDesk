@@ -75,8 +75,8 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
     }
   }, [])
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!data) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const { stats, todaysClasses, notices, recentCheckIns } = data
 
@@ -105,24 +105,28 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
               </button>
             }
           />
-          <ul className="space-y-3">
-            {todaysClasses.map((s) => (
-              <li key={s.id} className="flex items-center gap-4 rounded-md border border-border p-3">
-                <div className="w-16 shrink-0 text-center">
-                  <p className="font-mono text-sm font-bold">{s.start}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{s.end}</p>
-                </div>
-                <div className="h-10 w-px bg-border" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{s.module}</p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {s.code} · Room {s.room}
-                  </p>
-                </div>
-                <span className="hidden shrink-0 text-sm text-muted-foreground sm:block">{s.staff}</span>
-              </li>
-            ))}
-          </ul>
+          {todaysClasses.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">No classes scheduled today.</p>
+          ) : (
+            <ul className="space-y-3">
+              {todaysClasses.map((s) => (
+                <li key={s.id} className="flex items-center gap-4 rounded-md border border-border p-3">
+                  <div className="w-16 shrink-0 text-center">
+                    <p className="font-mono text-sm font-bold">{s.start}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{s.end}</p>
+                  </div>
+                  <div className="h-10 w-px bg-border" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{s.module}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {s.code} · Room {s.room}
+                    </p>
+                  </div>
+                  <span className="hidden shrink-0 text-sm text-muted-foreground sm:block">{s.staff}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         {/* Quick actions + notices */}
@@ -143,17 +147,21 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
 
           <Card>
             <SectionHeading title="Latest notices" />
-            <ul className="space-y-3">
-              {notices.slice(0, 3).map((n) => (
-                <li key={n.id} className="flex gap-3">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{n.title}</p>
-                    <p className="text-xs text-muted-foreground">{n.time}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {notices.length === 0 ? (
+              <p className="rounded-md border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">No notices right now.</p>
+            ) : (
+              <ul className="space-y-3">
+                {notices.slice(0, 3).map((n) => (
+                  <li key={n.id} className="flex gap-3">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{n.title}</p>
+                      <p className="text-xs text-muted-foreground">{n.time}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </div>
       </div>
@@ -168,20 +176,24 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
               </button>
             }
           />
-          <ul className="divide-y divide-border">
-            {recentCheckIns.map((st) => (
-              <li key={`${st.name}-${st.time}`} className="flex items-center justify-between py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{st.name}</p>
-                  <p className="font-mono text-xs text-muted-foreground">{st.rollNo}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground">{st.time}</span>
-                  <StatusBadge status={st.status} />
-                </div>
-              </li>
-            ))}
-          </ul>
+          {recentCheckIns.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">No check-ins yet today.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {recentCheckIns.map((st) => (
+                <li key={`${st.name}-${st.time}`} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">{st.name}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{st.rollNo}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-muted-foreground">{st.time}</span>
+                    <StatusBadge status={st.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
     </div>

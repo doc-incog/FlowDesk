@@ -52,7 +52,11 @@ export function AIChat() {
   return (
     <>
       {open && (
-        <div className="glass-strong fixed bottom-24 right-4 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl">
+        <div
+          role="dialog"
+          aria-label="Flow Assistant chat"
+          className="glass-strong fixed bottom-24 right-4 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl"
+        >
           <div className="flex items-center gap-2.5 border-b border-border bg-secondary/40 px-4 py-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Bot className="h-4.5 w-4.5" aria-hidden />

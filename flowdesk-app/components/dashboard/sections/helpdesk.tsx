@@ -84,9 +84,9 @@ export function HelpdeskSection({ role }: { role: Role }) {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!complaints || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!complaints || !me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const setComplaintsSafe: React.Dispatch<React.SetStateAction<Complaint[]>> = (updater) =>
     setComplaints((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
@@ -146,10 +146,12 @@ function NewComplaint({
       <div className="space-y-3">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Category</label>
-          <div className="flex flex-wrap gap-2">
+          <div role="radiogroup" aria-label="Select a category" className="flex flex-wrap gap-2">
             {COMPLAINT_CATEGORIES.map((c) => (
               <button
                 key={c}
+                role="radio"
+                aria-checked={category === c}
                 onClick={() => setCategory(c)}
                 className={cn(
                   "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
@@ -162,8 +164,9 @@ function NewComplaint({
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Subject</label>
+          <label htmlFor="help-subject" className="text-sm font-medium">Subject</label>
           <input
+            id="help-subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Brief summary of the issue"
@@ -171,8 +174,9 @@ function NewComplaint({
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Description</label>
+          <label htmlFor="help-description" className="text-sm font-medium">Description</label>
           <textarea
+            id="help-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
@@ -180,7 +184,7 @@ function NewComplaint({
             className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
           />
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button
           onClick={() => {
             if (!subject.trim() || !description.trim()) {
@@ -259,14 +263,19 @@ function ComplaintCard({
       </div>
 
       <div className="mt-4 border-t border-border pt-3">
-        <button onClick={() => setExpanded((e) => !e)} className="flex items-center gap-1.5 text-sm font-medium text-primary">
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
+          aria-controls={`comments-${complaint.id}`}
+          className="flex items-center gap-1.5 text-sm font-medium text-primary"
+        >
           <MessageSquare className="h-4 w-4" aria-hidden />
           {complaint.comments.length} comment{complaint.comments.length === 1 ? "" : "s"}
           <span className="text-muted-foreground">{expanded ? "▾" : "▸"}</span>
         </button>
 
         {expanded && (
-          <div className="mt-3 space-y-3">
+          <div id={`comments-${complaint.id}`} className="mt-3 space-y-3">
             {complaint.comments.map((cm) => (
               <div key={cm} className="rounded-md border border-border bg-secondary/50 px-3.5 py-2.5">
                 <p className="text-sm text-muted-foreground">{cm}</p>
@@ -283,6 +292,7 @@ function ComplaintCard({
                       if (e.key === "Enter") addComment()
                     }}
                     placeholder="Add a comment…"
+                    aria-label="Comment"
                     className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
                   />
                   <button

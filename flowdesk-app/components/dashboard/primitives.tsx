@@ -30,6 +30,7 @@ export function StatCard({
   label,
   value,
   hint,
+  icon,
   tone = "primary",
 }: {
   label: string
@@ -49,6 +50,7 @@ export function StatCard({
       <div className="flex items-center gap-1.5">
         <span className={cn("h-1.5 w-1.5 rounded-full", dotMap[tone])} aria-hidden />
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        {icon && <span className="ml-auto flex h-6 w-6 items-center justify-center text-muted-foreground [&_svg]:h-4 [&_svg]:w-4">{icon}</span>}
       </div>
       <p className="mt-2 text-2xl font-semibold leading-none tracking-tight">{value}</p>
       {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}

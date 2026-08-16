@@ -85,9 +85,9 @@ export function AdmissionsSection() {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!applications) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!applications) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const list = applications.filter((a) => filter === "all" || a.status === filter)
 
@@ -126,6 +126,7 @@ export function AdmissionsSection() {
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={cn(
               "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
@@ -182,6 +183,7 @@ export function AdmissionsSection() {
                   defaultValue={a.notes}
                   onChange={(e) => setNotes((n) => ({ ...n, [a.id]: e.target.value }))}
                   placeholder="Add a review note…"
+                  aria-label="Review note"
                   className="flex-1 rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
                 />
                 <div className="flex shrink-0 items-center gap-2">

@@ -32,7 +32,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="ambient flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 lg:flex-row lg:gap-14 lg:px-14">
+    <main id="main" tabIndex={-1} className="ambient flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 lg:flex-row lg:gap-14 lg:px-14">
       {/* Brand panel */}
       <section className="relative z-10 w-full max-w-md pb-10 lg:pb-0">
         <div className="flex items-center gap-3">

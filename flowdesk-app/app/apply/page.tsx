@@ -130,7 +130,7 @@ export default function ApplyPage() {
   const labelCls = "text-sm font-medium"
 
   return (
-    <main className="ambient min-h-screen bg-background">
+    <main id="main" tabIndex={-1} className="ambient min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-background/70 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4">
           <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
@@ -155,6 +155,7 @@ export default function ApplyPage() {
           <div className="mt-7 inline-flex rounded-lg border border-border bg-secondary/60 p-1 text-sm">
             <button
               onClick={() => setView("apply")}
+              aria-pressed={view === "apply"}
               className={cn(
                 "flex items-center gap-2 rounded-md px-4 py-2 transition-colors",
                 view === "apply" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
@@ -164,6 +165,7 @@ export default function ApplyPage() {
             </button>
             <button
               onClick={() => setView("track")}
+              aria-pressed={view === "track"}
               className={cn(
                 "flex items-center gap-2 rounded-md px-4 py-2 transition-colors",
                 view === "track" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
@@ -180,7 +182,7 @@ export default function ApplyPage() {
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-success/50 bg-success/10 text-success">
                 <CheckCircle2 className="h-8 w-8" aria-hidden />
               </span>
-              <p className="mt-5 text-xl font-semibold">Application submitted</p>
+              <p role="status" className="mt-5 text-xl font-semibold">Application submitted</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Your application ID is{" "}
                 <span className="font-mono font-semibold text-primary">{submittedId}</span>. Save it to track your
@@ -200,11 +202,11 @@ export default function ApplyPage() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
               <Card className="lg:col-span-2">
                 <SectionHeading title="Programmes" description="2026 intake options." />
-                <div className="space-y-2">
+                <div role="radiogroup" aria-label="Select a programme" className="space-y-2">
                   {programsLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading programmes…</p>
+                    <p role="status" className="text-sm text-muted-foreground">Loading programmes…</p>
                   ) : programsError ? (
-                    <p className="text-sm text-destructive">{programsError}</p>
+                    <p role="alert" className="text-sm text-destructive">{programsError}</p>
                   ) : programs.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No programmes available.</p>
                   ) : null}
@@ -213,6 +215,8 @@ export default function ApplyPage() {
                     return (
                       <button
                         key={p.id}
+                        role="radio"
+                        aria-checked={selected}
                         onClick={() => setForm((f) => ({ ...f, programId: p.id }))}
                         className={cn(
                           "w-full rounded-xl border px-4 py-3 text-left transition-colors",
@@ -238,17 +242,18 @@ export default function ApplyPage() {
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <label className={labelCls}>Full name</label>
-                      <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Rohan Verma" className={inputCls} />
+                      <label htmlFor="apply-name" className={labelCls}>Full name</label>
+                      <input id="apply-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Rohan Verma" className={inputCls} />
                     </div>
                     <div className="space-y-1.5">
-                      <label className={labelCls}>Email</label>
-                      <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="you@example.com" className={inputCls} />
+                      <label htmlFor="apply-email" className={labelCls}>Email</label>
+                      <input id="apply-email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="you@example.com" className={inputCls} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className={labelCls}>Entrance / qualifying score</label>
+                    <label htmlFor="apply-score" className={labelCls}>Entrance / qualifying score</label>
                     <input
+                      id="apply-score"
                       type="number"
                       min={0}
                       max={100}
@@ -275,7 +280,7 @@ export default function ApplyPage() {
                       </p>
                     )}
                   </div>
-                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
                   <button
                     onClick={submit}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.99]"
@@ -294,8 +299,9 @@ export default function ApplyPage() {
             <SectionHeading title="Track your application" description="Enter the application ID you received at submission." />
             <div className="space-y-5">
               <div className="space-y-1.5">
-                <label className={labelCls}>Application ID</label>
+                <label htmlFor="apply-track" className={labelCls}>Application ID</label>
                 <input
+                  id="apply-track"
                   value={trackId}
                   onChange={(e) => setTrackId(e.target.value)}
                   placeholder="e.g. aa-1782500000000-abc123"
@@ -325,7 +331,7 @@ export default function ApplyPage() {
                   </div>
                 </div>
               ) : trackId.trim() ? (
-                <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+                <p role="alert" className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
                   No application found with that ID. Double-check the ID or try applying first.
                 </p>
               ) : null}

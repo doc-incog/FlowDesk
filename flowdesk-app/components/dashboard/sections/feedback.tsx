@@ -67,9 +67,9 @@ export function FeedbackSection() {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!entries || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!entries || !me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const visibleTargets = targets.filter((t) => filter === "all" || t.type === filter)
 
@@ -108,6 +108,7 @@ export function FeedbackSection() {
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={cn(
               "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
@@ -166,6 +167,7 @@ export function FeedbackSection() {
               onChange={(e) => setComment(e.target.value)}
               rows={3}
               placeholder="Anything specific you'd like to add? (optional)"
+              aria-label="Comment"
               className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
             />
             <button
@@ -183,7 +185,7 @@ export function FeedbackSection() {
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
               <MessageSquareText className="h-8 w-8" aria-hidden />
             </span>
-            <p className="font-bold">Thank you for your feedback!</p>
+            <p role="status" className="font-bold">Thank you for your feedback!</p>
             <p className="text-sm text-muted-foreground">Your rating for {target?.name} has been recorded.</p>
             <button
               onClick={() => setTarget(null)}

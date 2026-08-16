@@ -314,7 +314,7 @@ export function DashboardShell() {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 lg:px-6 lg:py-8">
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 lg:px-6 lg:py-8">
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>

@@ -64,8 +64,8 @@ export function ScheduleSection({ role }: { role: Role }) {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
 
   const byDay = (d: string) => schedule.filter((s) => s.day === d).sort((a, b) => a.start.localeCompare(b.start))
   const conflicts = findConflicts(schedule)
@@ -115,10 +115,12 @@ export function ScheduleSection({ role }: { role: Role }) {
 
           {/* Day picker — mobile */}
           <div className="lg:hidden">
-            <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            <div role="radiogroup" aria-label="Select a day" className="mb-4 flex gap-2 overflow-x-auto pb-1">
               {DAYS.map((d) => (
                 <button
                   key={d}
+                  role="radio"
+                  aria-checked={day === d}
                   onClick={() => setDay(d)}
                   className={cn(
                     "shrink-0 rounded-sm px-4 py-2 text-sm font-medium transition-colors",
@@ -280,25 +282,25 @@ function AddSlotView({
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Day</label>
-              <select value={form.day} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} className={inputCls}>
+              <label htmlFor="schedule-day" className="text-sm font-medium">Day</label>
+              <select id="schedule-day" value={form.day} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} className={inputCls}>
                 {DAYS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Start</label>
-              <input type="time" value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} className={inputCls} />
+              <label htmlFor="schedule-start" className="text-sm font-medium">Start</label>
+              <input id="schedule-start" type="time" value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">End</label>
-              <input type="time" value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
+              <label htmlFor="schedule-end" className="text-sm font-medium">End</label>
+              <input id="schedule-end" type="time" value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Module</label>
-            <select value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className={inputCls}>
+            <label htmlFor="schedule-module" className="text-sm font-medium">Module</label>
+            <select id="schedule-module" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className={inputCls}>
               <option value="">Select…</option>
               {modules.map(([code, name]) => (
                 <option key={code} value={code}>
@@ -309,12 +311,12 @@ function AddSlotView({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Room</label>
-              <input value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />
+              <label htmlFor="schedule-room" className="text-sm font-medium">Room</label>
+              <input id="schedule-room" value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Faculty</label>
-              <select value={form.staff} onChange={(e) => setForm((f) => ({ ...f, staff: e.target.value }))} className={inputCls}>
+              <label htmlFor="schedule-faculty" className="text-sm font-medium">Faculty</label>
+              <select id="schedule-faculty" value={form.staff} onChange={(e) => setForm((f) => ({ ...f, staff: e.target.value }))} className={inputCls}>
                 {staff.map((s) => (
                   <option key={s.id} value={s.name}>{s.name}</option>
                 ))}
@@ -322,11 +324,11 @@ function AddSlotView({
             </div>
           </div>
           {conflict && (
-            <p className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+            <p role="alert" className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {conflict}
             </p>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"

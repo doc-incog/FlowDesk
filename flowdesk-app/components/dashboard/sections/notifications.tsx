@@ -40,9 +40,9 @@ export function NotificationsSection() {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!items) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!items) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const visible = filter === "all" ? items : items.filter((n) => n.category === filter)
   const unread = items.filter((n) => n.unread).length
@@ -74,6 +74,7 @@ export function NotificationsSection() {
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={cn(
               "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
@@ -101,7 +102,12 @@ export function NotificationsSection() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold">{n.title}</p>
-                  {n.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />}
+                  {n.unread && (
+                    <>
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+                      <span className="sr-only">Unread</span>
+                    </>
+                  )}
                 </div>
                 <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{n.body}</p>
                 <p className="mt-2 font-mono text-xs text-muted-foreground">{n.time}</p>

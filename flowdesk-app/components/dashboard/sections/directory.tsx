@@ -51,9 +51,9 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
       : `${data.length} faculty and staff members`
     : ""
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!data) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   return (
     <div className="space-y-6">
@@ -66,6 +66,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
           onChange={(e) => setQuery(e.target.value)}
           type="search"
           placeholder={`Search ${kind}…`}
+          aria-label="Search people"
           className="w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
         />
       </div>

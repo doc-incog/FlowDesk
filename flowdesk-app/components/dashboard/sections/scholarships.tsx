@@ -99,9 +99,9 @@ export function ScholarshipsSection({ role }: { role: Role }) {
     }
   }, [])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
+  if (!me) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
 
   const openApply = (s: Scholarship) => {
     setApplyTarget(s)
@@ -139,11 +139,15 @@ export function ScholarshipsSection({ role }: { role: Role }) {
       <SectionTabs tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === "browse" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {scholarships.map((s) => (
-            <ScholarshipCard key={s.id} s={s} canApply={isStudent} onApply={() => openApply(s)} />
-          ))}
-        </div>
+        scholarships.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">No scholarships available right now.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {scholarships.map((s) => (
+              <ScholarshipCard key={s.id} s={s} canApply={isStudent} onApply={() => openApply(s)} />
+            ))}
+          </div>
+        )
       ) : (
         <StudentApplications applications={applications} scholarships={scholarships} me={me} />
       )}
@@ -182,7 +186,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <div className="flex flex-col items-center gap-3 py-6 text-center" role="status">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
               <CheckCircle2 className="h-8 w-8" aria-hidden />
             </span>
@@ -308,6 +312,7 @@ function AdminScholarships({
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className={cn(
               "rounded-sm px-3 py-1.5 text-sm font-medium capitalize transition-colors",
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",

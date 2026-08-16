@@ -147,6 +147,22 @@
   ::selection {
     background-color: color-mix(in oklch, var(--primary) 22%, transparent);
   }
+  /* Always show a clear keyboard-focus indicator, regardless of hover state. */
+  :focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--ring) 75%, transparent);
+    outline-offset: 2px;
+  }
+  /* Honours the user's motion preference by collapsing animations/transitions. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {

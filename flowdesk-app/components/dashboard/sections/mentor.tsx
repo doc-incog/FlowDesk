@@ -30,8 +30,8 @@ export function MentorSection({ role, mentorId }: { role: Role; mentorId?: strin
     }
   }, [role, mentorId])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
 
   // Staff members see their mentees; students see their assigned mentor.
   if (role === "staff") {
@@ -102,9 +102,12 @@ export function MentorSection({ role, mentorId }: { role: Role; mentorId?: strin
           >
             <Mail className="h-4 w-4" aria-hidden /> Message mentor
           </a>
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-sm border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-secondary">
+          <a
+            href={`mailto:${mentor.email}?subject=Meeting%20request`}
+            className="flex flex-1 items-center justify-center gap-2 rounded-sm border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-secondary"
+          >
             <CalendarPlus className="h-4 w-4" aria-hidden /> Book a meeting
-          </button>
+          </a>
         </div>
       </Card>
     </div>
@@ -114,7 +117,7 @@ export function MentorSection({ role, mentorId }: { role: Role; mentorId?: strin
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-3 rounded-md border border-border p-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
+      <span aria-hidden className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
         {icon}
       </span>
       <div className="min-w-0">
