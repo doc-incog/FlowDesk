@@ -7,7 +7,7 @@ const SESSION_COOKIE = "flowdesk.session"
  * /dashboard are redirected to the login page. Full session validity is
  * enforced by GET /api/auth/me.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasSession = request.cookies.has(SESSION_COOKIE)
 

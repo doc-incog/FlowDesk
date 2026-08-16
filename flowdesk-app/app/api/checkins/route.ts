@@ -2,19 +2,9 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { getDb, findUserById, mapUser } from "@/lib/db"
 import { clockTime, localDate, localDateTime } from "@/lib/datetime"
+import { statusFor } from "@/lib/attendance"
 
 export const runtime = "nodejs"
-
-function statusFor(time: string): "on-time" | "late" {
-  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
-  if (!match) return "late"
-  let hours = parseInt(match[1], 10)
-  const minutes = parseInt(match[2], 10)
-  const ampm = match[3].toUpperCase()
-  if (ampm === "PM" && hours < 12) hours += 12
-  if (ampm === "AM" && hours === 12) hours = 0
-  return hours * 60 + minutes <= 9 * 60 ? "on-time" : "late"
-}
 
 export async function GET(request: Request) {
   const user = await getSessionUser()
