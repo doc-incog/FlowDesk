@@ -2,21 +2,31 @@ import '../../data/mock_data.dart' as mock;
 import '../../models/role.dart';
 import '../../models/user.dart';
 import '../contract/auth_repository.dart';
+import '../contract/directory_repository.dart';
 import '../persisted_store.dart';
 
 const _sessionKey = 'flowdesk.session';
 
+/// Default password for every directory account in the demo.
+const defaultPassword = 'campus123';
+
 class MockAuthRepository implements AuthRepository {
-  MockAuthRepository(this._store);
+  MockAuthRepository(this._store, this._directory);
 
   final PersistedStore _store;
+  final DirectoryRepository _directory;
 
   @override
   UserProfile? restoreSession() {
     final raw = _store.getString(_sessionKey);
     if (raw == null) return null;
+    final byId = _directory.findById(raw);
+    if (byId != null) return byId;
+    // legacy sessions stored a role key instead of a user id
     try {
-      return mock.demoUsers[Role.fromKey(raw)];
+      return mock.demoUsers.entries
+          .firstWhere((e) => e.key.key == raw)
+          .value;
     } catch (_) {
       return null;
     }
@@ -28,20 +38,17 @@ class MockAuthRepository implements AuthRepository {
 
     if (normalized == mock.adminCreds.email && password == mock.adminCreds.password) {
       final profile = mock.demoUsers[Role.admin]!;
-      _store.setString(_sessionKey, profile.role.key);
+      _store.setString(_sessionKey, profile.id);
       return profile;
     }
 
-    final known = [...mock.students, ...mock.staff]
-        .where((u) => u.email.toLowerCase() == normalized)
-        .toList();
-    if (known.isEmpty) return null;
+    if (password != defaultPassword) return null;
 
-    final profile = known.first.role == Role.staff
-        ? mock.demoUsers[Role.staff]!
-        : mock.demoUsers[Role.student]!;
-    _store.setString(_sessionKey, profile.role.key);
-    return profile;
+    final known = _directory.findByEmail(normalized);
+    if (known == null) return null;
+
+    _store.setString(_sessionKey, known.id);
+    return known;
   }
 
   @override

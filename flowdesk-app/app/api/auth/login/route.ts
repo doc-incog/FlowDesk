@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { findUserByEmail, mapUser } from "@/lib/db"
 import { verifyPassword } from "@/lib/db/password"
 import { createSession, purgeExpiredSessions } from "@/lib/auth"
+import { withPermissions } from "@/lib/permissions"
 
 export const runtime = "nodejs"
 
@@ -27,5 +28,5 @@ export async function POST(request: Request) {
   purgeExpiredSessions()
   await createSession(user.id)
 
-  return NextResponse.json({ user: mapUser(user) })
+  return NextResponse.json({ user: withPermissions(mapUser(user)) })
 }

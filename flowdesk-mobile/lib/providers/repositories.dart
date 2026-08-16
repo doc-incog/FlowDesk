@@ -5,18 +5,22 @@ import '../repositories/contract/admissions_repository.dart';
 import '../repositories/contract/assignments_repository.dart';
 import '../repositories/contract/auth_repository.dart';
 import '../repositories/contract/complaints_repository.dart';
+import '../repositories/contract/directory_repository.dart';
 import '../repositories/contract/exams_repository.dart';
 import '../repositories/contract/feedback_repository.dart';
 import '../repositories/contract/fees_repository.dart';
+import '../repositories/contract/permissions_repository.dart';
 import '../repositories/contract/schedule_repository.dart';
 import '../repositories/contract/scholarships_repository.dart';
 import '../repositories/mock/mock_admissions_repository.dart';
 import '../repositories/mock/mock_assignments_repository.dart';
 import '../repositories/mock/mock_auth_repository.dart';
 import '../repositories/mock/mock_complaints_repository.dart';
+import '../repositories/mock/mock_directory_repository.dart';
 import '../repositories/mock/mock_exams_repository.dart';
 import '../repositories/mock/mock_feedback_repository.dart';
 import '../repositories/mock/mock_fees_repository.dart';
+import '../repositories/mock/mock_permissions_repository.dart';
 import '../repositories/mock/mock_schedule_repository.dart';
 import '../repositories/mock/mock_scholarships_repository.dart';
 import '../repositories/persisted_store.dart';
@@ -32,7 +36,18 @@ final persistedStoreProvider = Provider<PersistedStore>(
 
 /// Composition root: swap mock implementations for remote/API ones here.
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => MockAuthRepository(ref.watch(persistedStoreProvider)),
+  (ref) => MockAuthRepository(
+    ref.watch(persistedStoreProvider),
+    ref.watch(directoryRepositoryProvider),
+  ),
+);
+
+final directoryRepositoryProvider = Provider<DirectoryRepository>(
+  (ref) => MockDirectoryRepository(ref.watch(persistedStoreProvider)),
+);
+
+final permissionsRepositoryProvider = Provider<PermissionsRepository>(
+  (ref) => MockPermissionsRepository(ref.watch(persistedStoreProvider)),
 );
 
 final scheduleRepositoryProvider = Provider<ScheduleRepository>(

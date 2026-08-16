@@ -19,6 +19,12 @@ class AuthController extends Notifier<UserProfile?> {
     ref.read(authRepositoryProvider).logout();
     state = null;
   }
+
+  /// Replaces the current user in state (self profile edits). The directory
+  /// is updated separately so the change survives a session restore.
+  void updateUser(UserProfile updated) {
+    state = updated;
+  }
 }
 
 final authProvider = NotifierProvider<AuthController, UserProfile?>(AuthController.new);

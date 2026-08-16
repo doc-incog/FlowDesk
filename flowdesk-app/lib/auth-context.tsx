@@ -8,6 +8,7 @@ type AuthContextValue = {
   ready: boolean
   login: (email: string, password: string) => Promise<UserProfile | null>
   logout: () => Promise<void>
+  refreshUser: () => Promise<UserProfile | null>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -49,7 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, ready, login, logout }}>{children}</AuthContext.Provider>
+  const refreshUser = async (): Promise<UserProfile | null> => {
+    try {
+      const res = await fetch("/api/auth/me")
+      const data = await res.json()
+      if (data?.user) setUser(data.user)
+      return data?.user ?? null
+    } catch {
+      return null
+    }
+  }
+
+  return <AuthContext.Provider value={{ user, ready, login, logout, refreshUser }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

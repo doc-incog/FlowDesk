@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   LifeBuoy,
   MessageSquareText,
+  ShieldCheck,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { NotificationItem, Role } from "@/lib/seed-data/core"
@@ -42,6 +43,8 @@ import { ScholarshipsSection } from "@/components/dashboard/sections/scholarship
 import { AdmissionsSection } from "@/components/dashboard/sections/admissions"
 import { HelpdeskSection } from "@/components/dashboard/sections/helpdesk"
 import { FeedbackSection } from "@/components/dashboard/sections/feedback"
+import { ProfileSection } from "@/components/dashboard/sections/profile"
+import { RolesSection } from "@/components/dashboard/sections/roles"
 
 export type SectionId =
   | "overview"
@@ -58,6 +61,8 @@ export type SectionId =
   | "admissions"
   | "helpdesk"
   | "feedback"
+  | "profile"
+  | "roles"
 
 type NavItem = {
   id: SectionId
@@ -81,6 +86,8 @@ const NAV: NavItem[] = [
   { id: "admissions", label: "Admissions", icon: ClipboardCheck, roles: ["admin"] },
   { id: "helpdesk", label: "Helpdesk", icon: LifeBuoy, roles: ["student", "staff", "admin"] },
   { id: "feedback", label: "Feedback", icon: MessageSquareText, roles: ["student", "staff", "admin"] },
+  { id: "profile", label: "Profile", icon: UserRound, roles: ["student", "staff", "admin"] },
+  { id: "roles", label: "Roles & permissions", icon: ShieldCheck, roles: ["admin"] },
 ]
 
 const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {
@@ -129,7 +136,15 @@ export function DashboardShell() {
     }
   }, [])
 
-  const navItems = useMemo(() => (user ? NAV.filter((n) => n.roles.includes(user.role)) : []), [user])
+  const navItems = useMemo(
+    () =>
+      user
+        ? NAV.filter((n) =>
+            user.sections?.length ? user.sections.includes(n.id) : n.roles.includes(user.role),
+          )
+        : [],
+    [user],
+  )
 
   if (!ready || !user) {
     return (
@@ -178,6 +193,10 @@ export function DashboardShell() {
         return <HelpdeskSection role={user.role} />
       case "feedback":
         return <FeedbackSection />
+      case "profile":
+        return <ProfileSection />
+      case "roles":
+        return <RolesSection />
       default:
         return null
     }
@@ -285,7 +304,7 @@ export function DashboardShell() {
           </button>
 
           <div className="hidden items-center gap-2.5 sm:flex">
-            <span className="text-sm font-medium">{ROLE_META[user.role].label} workspace</span>
+            <span className="text-sm font-medium">{user.roleLabel ?? ROLE_META[user.role]?.label ?? user.role} workspace</span>
             <RoleBadge role={user.role} />
           </div>
 
@@ -310,10 +329,15 @@ export function DashboardShell() {
                 <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" aria-hidden />
               )}
             </button>
-            <Avatar initials={user.avatarInitials} className="h-9 w-9" />
+            <button
+              onClick={() => setActive("profile")}
+              className="rounded-full transition-opacity hover:opacity-80"
+              aria-label="Open your profile"
+            >
+              <Avatar initials={user.avatarInitials} className="h-9 w-9" />
+            </button>
           </div>
         </header>
-
         <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 lg:px-6 lg:py-8">
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>

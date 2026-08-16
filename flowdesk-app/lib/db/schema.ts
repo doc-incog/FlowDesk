@@ -1,22 +1,52 @@
 import type { DatabaseSync } from "node:sqlite"
 
+/** Users table DDL — shared with the in-place migration in lib/db. */
+export const USERS_TABLE_DDL = `(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  avatar_initials TEXT NOT NULL,
+  department TEXT NOT NULL DEFAULT '',
+  batch TEXT,
+  semester TEXT,
+  roll_no TEXT,
+  mentor_id TEXT,
+  designation TEXT,
+  subjects TEXT,
+  phone TEXT,
+  address TEXT,
+  guardian_name TEXT,
+  guardian_phone TEXT,
+  emergency_contact TEXT,
+  dob TEXT
+)`
+
 export function createSchema(db: DatabaseSync) {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('student','staff','admin')),
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      avatar_initials TEXT NOT NULL,
-      department TEXT NOT NULL DEFAULT '',
-      batch TEXT,
-      semester TEXT,
-      roll_no TEXT,
-      mentor_id TEXT,
-      designation TEXT,
-      subjects TEXT
+    CREATE TABLE IF NOT EXISTS users ${USERS_TABLE_DDL};
+
+    CREATE TABLE IF NOT EXISTS roles (
+      key TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      blurb TEXT NOT NULL,
+      accent TEXT NOT NULL,
+      builtin INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      role TEXT NOT NULL REFERENCES roles(key) ON DELETE CASCADE,
+      section TEXT NOT NULL,
+      PRIMARY KEY (role, section)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_permissions (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      section TEXT NOT NULL,
+      PRIMARY KEY (user_id, section)
+    );
+
 
     CREATE TABLE IF NOT EXISTS sessions (
       token TEXT PRIMARY KEY,

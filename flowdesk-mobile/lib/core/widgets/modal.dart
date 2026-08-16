@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Shows a modal bottom sheet styled like the web app's Modal.
-Future<void> showAppModal({
+Future<T?> showAppModal<T>({
   required BuildContext context,
   required String title,
   required Widget child,
   bool showClose = true,
 }) {
   final scheme = Theme.of(context).colorScheme;
-  return showModalBottomSheet<void>(
+  return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

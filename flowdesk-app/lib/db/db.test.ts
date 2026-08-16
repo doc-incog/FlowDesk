@@ -36,6 +36,44 @@ describe("database", () => {
     ])
   })
 
+  it("seeds built-in roles and their default permissions", () => {
+    const roles = db.prepare("SELECT key, builtin FROM roles ORDER BY key").all() as {
+      key: string
+      builtin: number
+    }[]
+    expect(roles).toEqual([
+      { key: "admin", builtin: 1 },
+      { key: "staff", builtin: 1 },
+      { key: "student", builtin: 1 },
+    ])
+
+    const adminSections = db
+      .prepare("SELECT section FROM role_permissions WHERE role = 'admin' ORDER BY section")
+      .all() as { section: string }[]
+    expect(adminSections.map((r) => r.section)).toContain("roles")
+    expect(adminSections.map((r) => r.section)).toContain("profile")
+
+    const perUser = db.prepare("SELECT COUNT(*) AS n FROM user_permissions").get() as { n: number }
+    expect(perUser.n).toBe(0)
+  })
+
+  it("users table has the contact columns (nullable) without a role CHECK", () => {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get() as {
+      sql: string
+    }
+    expect(row.sql).not.toMatch(/CHECK\s*\(\s*role\s+IN/i)
+    const info = db.prepare("PRAGMA table_info(users)").all() as { name: string }[]
+    const columns = info.map((c) => c.name)
+    for (const col of ["phone", "address", "guardian_name", "guardian_phone", "emergency_contact", "dob"]) {
+      expect(columns).toContain(col)
+    }
+  })
+
+  it("seeds a Sunday class slot", () => {
+    const sunday = db.prepare("SELECT COUNT(*) AS n FROM schedule_slots WHERE day = 'Sun'").get() as { n: number }
+    expect(sunday.n).toBeGreaterThan(0)
+  })
+
   it("admin login uses the documented demo email", () => {
     const admin = db.prepare("SELECT email FROM users WHERE role = 'admin'").get() as { email: string }
     expect(admin.email).toBe("admin@flowdesk.edu")

@@ -1,4 +1,5 @@
-export type Role = "student" | "staff" | "admin"
+/** A role key. Built-ins are student/staff/admin; admins can add custom keys. */
+export type Role = string
 
 export type UserProfile = {
   id: string
@@ -7,6 +8,9 @@ export type UserProfile = {
   email: string
   avatarInitials: string
   department: string
+  // dashboard visibility (effective for the signed-in user)
+  sections?: string[]
+  roleLabel?: string
   // student-specific
   batch?: string
   semester?: string
@@ -15,6 +19,13 @@ export type UserProfile = {
   // staff-specific
   designation?: string
   subjects?: string[]
+  // contact / personal info
+  phone?: string
+  address?: string
+  guardianName?: string
+  guardianPhone?: string
+  emergencyContact?: string
+  dob?: string
 }
 
 export type CheckInRecord = {
@@ -62,6 +73,42 @@ export type Mentor = {
 export const ADMIN_CREDS = {
   email: "admin@flowdesk.edu",
   password: "flowdesk-admin@2026",
+}
+
+/** Default password for newly created students/staff (matches seeded users). */
+export const DEFAULT_PASSWORD = "campus123"
+
+/** Every dashboard section key, used by the permissions editors. */
+export const SECTION_KEYS = [
+  "overview",
+  "checkin",
+  "notifications",
+  "students",
+  "staff",
+  "mentor",
+  "schedule",
+  "exams",
+  "assignments",
+  "fees",
+  "scholarships",
+  "admissions",
+  "helpdesk",
+  "feedback",
+  "profile",
+  "roles",
+] as const
+
+/** Default section visibility per role — the seed for role_permissions. */
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  student: [
+    "overview", "checkin", "notifications", "mentor", "schedule", "exams",
+    "assignments", "fees", "scholarships", "helpdesk", "feedback", "profile",
+  ],
+  staff: [
+    "overview", "checkin", "notifications", "students", "mentor", "schedule",
+    "exams", "assignments", "helpdesk", "feedback", "profile",
+  ],
+  admin: [...SECTION_KEYS],
 }
 
 export const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {
@@ -168,6 +215,7 @@ export const SCHEDULE: ScheduleSlot[] = [
   { id: "s4", day: "Wed", start: "10:30", end: "12:00", module: "Computer Networks", code: "CS305", room: "B-204", staff: "Prof. Karan Rao" },
   { id: "s5", day: "Thu", start: "09:00", end: "10:30", module: "Software Engineering", code: "CS306", room: "C-115", staff: "Dr. Neha Gupta" },
   { id: "s6", day: "Fri", start: "11:00", end: "12:30", module: "Theory of Computation", code: "CS303", room: "A-101", staff: "Prof. Karan Rao" },
+  { id: "s7", day: "Sun", start: "10:00", end: "12:00", module: "Python Workshop", code: "CS310", room: "C-101", staff: "Dr. Neha Gupta" },
 ]
 
 export const MENTORS: Mentor[] = [

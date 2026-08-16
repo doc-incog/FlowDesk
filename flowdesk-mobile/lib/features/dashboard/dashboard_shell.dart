@@ -9,6 +9,7 @@ import '../../core/widgets/theme_toggle.dart';
 import '../../models/role.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/notifications_controller.dart';
+import '../../providers/roles_controller.dart';
 import '../chat/ai_chat.dart';
 import 'section.dart';
 import 'sections/admissions_section.dart';
@@ -22,6 +23,8 @@ import 'sections/helpdesk_section.dart';
 import 'sections/mentor_section.dart';
 import 'sections/notifications_section.dart';
 import 'sections/overview_section.dart';
+import 'sections/profile_section.dart';
+import 'sections/roles_section.dart';
 import 'sections/schedule_section.dart';
 import 'sections/scholarships_section.dart';
 
@@ -46,14 +49,22 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       return const SizedBox.shrink();
     }
 
-    final navItems = SectionId.values.where((s) => s.roles.contains(user.role)).toList();
+    final rolesData = ref.watch(rolesProvider);
+    final sections = rolesData.effectiveSections(user.roleKeyValue, user.id);
+    final navItems =
+        SectionId.values.where((s) => sections.contains(s.key)).toList();
+    final active = navItems.contains(_active)
+        ? _active
+        : (navItems.isNotEmpty ? navItems.first : SectionId.overview);
+    final roleLabel = rolesData.labelFor(user.roleKeyValue) ?? user.role.label;
+    final canSeeNotifications = sections.contains(SectionId.notifications.key);
 
     return Scaffold(
       key: _scaffoldKey,
       drawer: _DrawerContent(
         user: user,
         navItems: navItems,
-        active: _active,
+        active: active,
         unread: unread,
         onSelect: (s) {
           setState(() => _active = s);
@@ -74,7 +85,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(user.role.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(roleLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             Text('workspace',
                 style: TextStyle(
                     fontSize: 11, color: scheme.onSurfaceVariant, height: 1)),
@@ -82,7 +93,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         ),
         actions: [
           IconButton(
-            onPressed: () => setState(() => _active = SectionId.notifications),
+            onPressed: canSeeNotifications
+                ? () => setState(() => _active = SectionId.notifications)
+                : null,
             icon: Badge(
               isLabelVisible: unread > 0,
               label: Text('$unread'),
@@ -95,7 +108,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             padding: const EdgeInsets.only(left: 4, right: 12),
             child: Center(
               child: GestureDetector(
-                onTap: () => setState(() => _active = SectionId.overview),
+                onTap: () => setState(() => _active = SectionId.profile),
                 child: Avatar(initials: user.avatarInitials, size: 34),
               ),
             ),
@@ -109,7 +122,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 980),
-                child: _buildSection(user),
+                child: _buildSection(user, active),
               ),
             ),
             const Positioned(right: 16, bottom: 16, child: AIChat()),
@@ -119,9 +132,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     );
   }
 
-  Widget _buildSection(dynamic user) {
+  Widget _buildSection(dynamic user, SectionId active) {
     final role = user.role as Role;
-    switch (_active) {
+    switch (active) {
       case SectionId.overview:
         return OverviewSection(role: role, onNavigate: (s) => setState(() => _active = s));
       case SectionId.checkin:
@@ -150,6 +163,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         return HelpdeskSection(role: role, currentUserName: user.name);
       case SectionId.feedback:
         return const FeedbackSection();
+      case SectionId.profile:
+        return const ProfileSection();
+      case SectionId.accessControl:
+        return const RolesSection();
     }
   }
 }

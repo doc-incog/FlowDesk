@@ -2,9 +2,11 @@ import type { DatabaseSync } from "node:sqlite"
 import {
   ADMIN_CREDS,
   CHECK_INS,
+  DEFAULT_ROLE_PERMISSIONS,
   DEMO_USERS,
   MENTORS,
   NOTIFICATIONS,
+  ROLE_META,
   SCHEDULE,
   STAFF,
   STUDENTS,
@@ -97,6 +99,18 @@ export function seedDatabase(db: DatabaseSync) {
     const stmt = db.prepare(sql)
     for (const row of rows) stmt.run(...row)
   }
+
+  insert("INSERT INTO roles (key,label,blurb,accent,builtin) VALUES (?,?,?,?,?)", [
+    ["student", ROLE_META.student.label, ROLE_META.student.blurb, ROLE_META.student.accent, 1],
+    ["staff", ROLE_META.staff.label, ROLE_META.staff.blurb, ROLE_META.staff.accent, 1],
+    ["admin", ROLE_META.admin.label, ROLE_META.admin.blurb, ROLE_META.admin.accent, 1],
+  ])
+
+  const roleSections: SqlValue[][] = []
+  for (const [role, sections] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {
+    for (const section of sections) roleSections.push([role, section])
+  }
+  insert("INSERT INTO role_permissions (role, section) VALUES (?,?)", roleSections)
 
   insert("INSERT INTO mentors (id,name,designation,department,email,phone,office,office_hours,avatar_initials,mentees) VALUES (?,?,?,?,?,?,?,?,?,?)", [
     ...MENTORS.map((m) => [m.id, m.name, m.designation, m.department, m.email, m.phone, m.office, m.officeHours, m.avatarInitials, m.mentees]),

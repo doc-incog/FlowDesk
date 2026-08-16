@@ -114,5 +114,19 @@ void main() {
           base, slot('2', 'Mon', '09:30', '10:30', room: 'R2', staff: 'P2'));
       expect(conflicts, isEmpty);
     });
+
+    test('flags a Sunday slot against another Sunday slot in the same room', () {
+      final sundayBase = [slot('7', 'Sun', '10:00', '12:00', room: 'C-101')];
+      final conflicts = detectConflicts(
+          sundayBase, slot('8', 'Sun', '11:00', '13:00', room: 'C-101'));
+      expect(conflicts, hasLength(1));
+    });
+
+    test('ignores a Monday slot colliding with a Sunday slot', () {
+      final sundayBase = [slot('7', 'Sun', '10:00', '12:00', room: 'C-101')];
+      final conflicts = detectConflicts(
+          sundayBase, slot('8', 'Mon', '10:30', '11:30', room: 'C-101'));
+      expect(conflicts, isEmpty);
+    });
   });
 }

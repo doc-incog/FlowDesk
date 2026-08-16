@@ -19,6 +19,12 @@ const demoUsers = <Role, UserProfile>{
     semester: 'Semester 5',
     rollNo: 'CS23-2043',
     mentorId: 'MEN-01',
+    phone: '+91 98765 12345',
+    address: '204, Lakeview Residency, Pune',
+    guardianName: 'Mrs. Farah Karim',
+    guardianPhone: '+91 98765 11122',
+    emergencyContact: '+91 98220 55511',
+    dob: '2005-04-12',
   ),
   Role.staff: UserProfile(
     id: 'STF-118',
@@ -29,6 +35,9 @@ const demoUsers = <Role, UserProfile>{
     department: 'Computer Science',
     designation: 'Associate Professor',
     subjects: ['Data Structures', 'Operating Systems'],
+    phone: '+91 98765 43210',
+    address: 'Faculty Block, Room 214',
+    dob: '1982-09-30',
   ),
   Role.admin: UserProfile(
     id: 'ADM-004',
@@ -38,6 +47,7 @@ const demoUsers = <Role, UserProfile>{
     avatarInitials: 'PS',
     department: 'Administration',
     designation: 'Campus Registrar',
+    phone: '+91 98100 22334',
   ),
 };
 
@@ -93,7 +103,29 @@ const schedule = <ScheduleSlot>[
   ScheduleSlot(id: 's4', day: 'Wed', start: '10:30', end: '12:00', module: 'Computer Networks', code: 'CS305', room: 'B-204', staff: 'Prof. Karan Rao'),
   ScheduleSlot(id: 's5', day: 'Thu', start: '09:00', end: '10:30', module: 'Software Engineering', code: 'CS306', room: 'C-115', staff: 'Dr. Neha Gupta'),
   ScheduleSlot(id: 's6', day: 'Fri', start: '11:00', end: '12:30', module: 'Theory of Computation', code: 'CS303', room: 'A-101', staff: 'Prof. Karan Rao'),
+  ScheduleSlot(id: 's7', day: 'Sun', start: '10:00', end: '12:00', module: 'Python Workshop', code: 'CS310', room: 'C-101', staff: 'Dr. Neha Gupta'),
 ];
+
+/// Days offered in the weekly routine. Sunday is a real, schedulable day.
+const scheduleDays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sun'];
+
+/// Default section visibility per role key — mirrors the web app's
+/// DEFAULT_ROLE_PERMISSIONS seed.
+const defaultRolePermissions = <String, List<String>>{
+  'student': [
+    'overview', 'checkin', 'notifications', 'mentor', 'schedule', 'exams',
+    'assignments', 'fees', 'scholarships', 'helpdesk', 'feedback', 'profile',
+  ],
+  'staff': [
+    'overview', 'checkin', 'notifications', 'students', 'mentor', 'schedule',
+    'exams', 'assignments', 'helpdesk', 'feedback', 'profile',
+  ],
+  'admin': [
+    'overview', 'checkin', 'notifications', 'students', 'staff', 'mentor',
+    'schedule', 'exams', 'assignments', 'fees', 'scholarships', 'admissions',
+    'helpdesk', 'feedback', 'profile', 'roles',
+  ],
+};
 
 const mentors = <Mentor>[
   Mentor(

@@ -7,7 +7,7 @@ import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sun"]
 
 type Conflict = {
   a: ScheduleSlot
@@ -91,7 +91,7 @@ export function ScheduleSection({ role }: { role: Role }) {
       {tab === "routine" && (
         <>
           {/* Weekly grid — desktop */}
-          <div className="hidden grid-cols-5 gap-4 lg:grid">
+          <div className="hidden grid-cols-6 gap-4 lg:grid">
             {DAYS.map((d) => (
               <div key={d} className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -240,14 +240,15 @@ function AddSlotView({
   })
   const [error, setError] = useState("")
   const [conflict, setConflict] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const add = () => {
+  const add = async () => {
     if (!form.code || !form.room) {
       setError("Module and room are required.")
       return
     }
     const moduleName = modules.find(([code]) => code === form.code)?.[1] ?? ""
-    const newSlot: ScheduleSlot = {
+    const draft: ScheduleSlot = {
       id: `s${Date.now()}`,
       day: form.day,
       start: form.start,
@@ -258,7 +259,7 @@ function AddSlotView({
       staff: form.staff,
     }
     const clashes = schedule.filter(
-      (s) => s.day === form.day && overlaps(s, newSlot) && (s.room === form.room || s.staff === form.staff),
+      (s) => s.day === form.day && overlaps(s, draft) && (s.room === form.room || s.staff === form.staff),
     )
     if (clashes.length > 0) {
       setConflict(
@@ -266,10 +267,27 @@ function AddSlotView({
       )
       return
     }
-    setSchedule((prev) => [...prev, newSlot])
-    setConflict(null)
+    setSaving(true)
     setError("")
-    setForm((f) => ({ ...f, code: "", room: "" }))
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setConflict(data?.error ?? "Could not save the slot.")
+        return
+      }
+      if (data?.slot) setSchedule((prev) => [...prev, data.slot])
+      setConflict(null)
+      setForm((f) => ({ ...f, code: "", room: "" }))
+    } catch {
+      setError("Network error while saving the slot.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputCls =
@@ -331,9 +349,10 @@ function AddSlotView({
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" aria-hidden /> Add slot
+            <Plus className="h-4 w-4" aria-hidden /> {saving ? "Adding…" : "Add slot"}
           </button>
         </div>
       </Card>

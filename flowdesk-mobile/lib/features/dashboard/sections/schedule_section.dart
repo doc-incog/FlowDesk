@@ -110,7 +110,7 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final d in const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+                for (final d in mock.scheduleDays)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: InkWell(
@@ -263,7 +263,7 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
                       value: _day,
                       isExpanded: true,
                       underline: const SizedBox.shrink(),
-                      items: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+                      items: mock.scheduleDays
                           .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                           .toList(),
                       onChanged: (v) => setState(() => _day = v ?? 'Mon'),

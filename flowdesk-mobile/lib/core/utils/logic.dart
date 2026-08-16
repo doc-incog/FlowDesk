@@ -1,7 +1,25 @@
 import '../../models/admission.dart';
 import '../../models/feedback.dart';
+import '../../models/role_definition.dart';
 import '../../models/schedule_slot.dart';
 import '../../data/mock_data.dart' as mock;
+
+/// Effective sections for a user: a per-user override wins, otherwise the
+/// role definition's defaults apply. Unknown roles fall back to the built-in
+/// student visibility so the shell never renders empty.
+Set<String> effectiveSectionsFor(
+  List<RoleDefinition> roles,
+  Map<String, Set<String>> overrides,
+  String roleKey,
+  String userId,
+) {
+  final override = overrides[userId];
+  if (override != null) return override;
+  for (final r in roles) {
+    if (r.key == roleKey) return r.sections;
+  }
+  return (mock.defaultRolePermissions['student'] ?? const []).toSet();
+}
 
 /// Linear admission workflow: submitted -> reviewing -> accepted.
 /// Returns null for terminal states.
