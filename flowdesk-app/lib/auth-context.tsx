@@ -1,15 +1,13 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { ADMIN_CREDS, DEMO_USERS, STAFF, STUDENTS, type Role, type UserProfile } from "@/lib/mock-data"
-
-const STORAGE_KEY = "flowdesk.session"
+import type { UserProfile } from "@/lib/seed-data/core"
 
 type AuthContextValue = {
   user: UserProfile | null
   ready: boolean
-  login: (email: string, password: string) => UserProfile | null
-  logout: () => void
+  login: (email: string, password: string) => Promise<UserProfile | null>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -19,53 +17,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const role = JSON.parse(raw) as Role
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time session hydration from localStorage
-        if (DEMO_USERS[role]) setUser(DEMO_USERS[role])
-      }
-    } catch {
-      // ignore corrupted session
-    }
-    setReady(true)
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user) setUser(data.user)
+      })
+      .catch(() => {
+        // session check failed — treated as signed out
+      })
+      .finally(() => setReady(true))
   }, [])
 
-  const login = (email: string, password: string): UserProfile | null => {
-    const normalized = email.trim().toLowerCase()
-
-    if (normalized === ADMIN_CREDS.email && password === ADMIN_CREDS.password) {
-      const profile = DEMO_USERS.admin
-      setUser(profile)
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify("admin"))
-      } catch {
-        // storage unavailable — session stays in memory
-      }
-      return profile
-    }
-
-    const known = [...STUDENTS, ...STAFF].find((u) => u.email.toLowerCase() === normalized)
-    if (!known) return null
-
-    const profile = known.role === "staff" ? DEMO_USERS.staff : DEMO_USERS.student
-    setUser(profile)
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profile.role))
-    } catch {
-      // storage unavailable — session stays in memory
-    }
-    return profile
+  const login = async (email: string, password: string): Promise<UserProfile | null> => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data?.user) return null
+    setUser(data.user)
+    return data.user as UserProfile
   }
 
-  const logout = () => {
-    setUser(null)
+  const logout = async () => {
     try {
-      window.localStorage.removeItem(STORAGE_KEY)
+      await fetch("/api/auth/logout", { method: "POST" })
     } catch {
-      // ignore
+      // network error — clear local state regardless
     }
+    setUser(null)
   }
 
   return <AuthContext.Provider value={{ user, ready, login, logout }}>{children}</AuthContext.Provider>

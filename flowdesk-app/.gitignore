@@ -1,7 +1,15 @@
 # Environment variables
+.env
 .env*.local
+!.env.example
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+
+# Local runtime data (SQLite database + uploads)
+.data/
+
+# TypeScript build info
+*.tsbuildinfo

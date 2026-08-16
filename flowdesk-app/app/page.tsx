@@ -14,14 +14,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState("aisha.karim@campus.edu")
   const [password, setPassword] = useState("campus123")
   const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (ready && user) router.replace("/dashboard")
   }, [ready, user, router])
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault()
-    const profile = login(email, password)
+    setSubmitting(true)
+    const profile = await login(email, password)
+    setSubmitting(false)
     if (!profile) {
       setError("Invalid credentials. Use a registered campus email, or the admin credentials shown below.")
       return
@@ -109,9 +112,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.99]"
+              disabled={submitting}
+              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.99] disabled:opacity-60"
             >
-              Sign in
+              {submitting ? "Signing in…" : "Sign in"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </button>
           </form>

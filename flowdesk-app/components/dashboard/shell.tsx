@@ -108,8 +108,8 @@ export function DashboardShell() {
   const mentorLabel = user.role === "staff" ? "Mentees" : "My Mentor"
   const unread = NOTIFICATIONS.filter((n) => n.unread).length
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.replace("/")
   }
 

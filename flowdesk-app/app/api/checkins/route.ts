@@ -1,0 +1,137 @@
+import { NextResponse } from "next/server"
+import { getSessionUser } from "@/lib/auth"
+import { getDb, findUserById, mapUser } from "@/lib/db"
+import { clockTime, localDate, localDateTime } from "@/lib/datetime"
+
+export const runtime = "nodejs"
+
+function statusFor(time: string): "on-time" | "late" {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+  if (!match) return "late"
+  let hours = parseInt(match[1], 10)
+  const minutes = parseInt(match[2], 10)
+  const ampm = match[3].toUpperCase()
+  if (ampm === "PM" && hours < 12) hours += 12
+  if (ampm === "AM" && hours === 12) hours = 0
+  return hours * 60 + minutes <= 9 * 60 ? "on-time" : "late"
+}
+
+export async function GET(request: Request) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { searchParams } = new URL(request.url)
+  const date = searchParams.get("date") ?? localDate()
+  const db = getDb()
+
+  const rows = db
+    .prepare(
+      `SELECT id, user_id, name, role, time, status, method, source
+       FROM check_ins WHERE substr(created_at, 1, 10) = ?
+       ORDER BY created_at DESC`,
+    )
+    .all(date) as {
+    id: string
+    user_id: string
+    name: string
+    role: string
+    time: string
+    status: string
+    method: string
+    source: string
+  }[]
+
+  // Students only see their own record; staff/admin see everyone.
+  const filtered =
+    user.role === "student" ? rows.filter((r) => r.user_id === user.id) : rows
+
+  const records = filtered.map((r) => ({
+    id: r.id,
+    name: r.name,
+    role: r.role,
+    time: r.time,
+    status: r.status,
+    method: r.method,
+    source: r.source,
+  }))
+
+  return NextResponse.json({ date, records })
+}
+
+export async function POST(request: Request) {
+  const sessionUser = await getSessionUser()
+  if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  let body: { method?: string; deviceId?: string; source?: "web" | "device"; studentId?: string } = {}
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
+  const db = getDb()
+
+  // Web check-ins are attributed to the session user. Device posts (the future
+  // ESP32 flow) identify the student explicitly via studentId.
+  let target = sessionUser
+  if (body.source === "device") {
+    const studentId = body.studentId?.trim()
+    if (!studentId) {
+      return NextResponse.json({ error: "studentId is required for device check-ins" }, { status: 400 })
+    }
+    const row = findUserById(studentId)
+    if (!row) return NextResponse.json({ error: "Unknown student" }, { status: 404 })
+    target = mapUser(row)
+  }
+
+  const method = body.method ?? (body.source === "device" ? "device" : "biometric")
+  const deviceId = body.deviceId?.trim() || null
+
+  const today = localDate()
+  const existing = db
+    .prepare(
+      "SELECT * FROM check_ins WHERE user_id = ? AND substr(created_at, 1, 10) = ?",
+    )
+    .get(target.id, today) as
+    | { id: string; time: string; status: string; method: string; device_id: string | null; source: string }
+    | undefined
+
+  if (existing) {
+    return NextResponse.json({
+      record: {
+        id: existing.id,
+        name: target.name,
+        role: target.role,
+        time: existing.time,
+        status: existing.status,
+        method: existing.method,
+        deviceId: existing.device_id,
+        source: existing.source,
+      },
+      alreadyCheckedIn: true,
+    })
+  }
+
+  const time = clockTime()
+  const status = statusFor(time)
+  const id = `ci-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  db.prepare(
+    `INSERT INTO check_ins (id, user_id, name, role, time, status, method, device_id, source, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, target.id, target.name, target.role, time, status, method, deviceId, body.source ?? "web", localDateTime())
+
+  return NextResponse.json({
+    record: {
+      id,
+      name: target.name,
+      role: target.role,
+      time,
+      status,
+      method,
+      deviceId,
+      source: body.source ?? "web",
+    },
+    alreadyCheckedIn: false,
+  })
+}
