@@ -11,5 +11,8 @@ node_modules
 # Local runtime data (SQLite database + uploads)
 .data/
 
+# Deploy bundles
+dist/
+
 # TypeScript build info
 *.tsbuildinfo
