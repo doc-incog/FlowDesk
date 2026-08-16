@@ -1,28 +1,77 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MessageSquareText, Star } from "lucide-react"
-import { FEEDBACK_ENTRIES, FEEDBACK_TARGETS, averageRating, type FeedbackEntry, type FeedbackTarget } from "@/lib/data/feedback"
-import { DEMO_USERS } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { RatingStars } from "@/components/ui/rating-stars"
 import { Progress } from "@/components/ui/progress"
 import { Modal } from "@/components/ui/modal"
 import { cn } from "@/lib/utils"
 
+type FeedbackTarget = {
+  id: string
+  type: "teacher" | "event"
+  name: string
+  subtitle: string
+}
+
+type FeedbackEntry = {
+  id: string
+  targetId: string
+  rating: number
+  comment: string
+  byName: string
+  createdAt: string
+}
+
+function averageRating(entries: FeedbackEntry[]): number {
+  if (entries.length === 0) return 0
+  return entries.reduce((sum, e) => sum + e.rating, 0) / entries.length
+}
+
 type Filter = "all" | "teacher" | "event"
 
 export function FeedbackSection() {
-  const [entries, setEntries] = useLocalStorage<FeedbackEntry[]>("flowdesk.feedback", FEEDBACK_ENTRIES)
+  const [entries, setEntries] = useState<FeedbackEntry[] | null>(null)
+  const [targets, setTargets] = useState<FeedbackTarget[]>([])
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>("all")
   const [target, setTarget] = useState<FeedbackTarget | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState("")
   const [submitted, setSubmitted] = useState(false)
 
-  const targets = FEEDBACK_TARGETS.filter((t) => filter === "all" || t.type === filter)
-  const me = DEMO_USERS.student
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/feedback").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([f, m]) => {
+        if (!alive) return
+        if (f?.error) setError(f.error)
+        else {
+          setTargets(f.targets ?? [])
+          setEntries(f.entries ?? [])
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !f?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!entries || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  const visibleTargets = targets.filter((t) => filter === "all" || t.type === filter)
 
   const openModal = (t: FeedbackTarget) => {
     setTarget(t)
@@ -34,7 +83,7 @@ export function FeedbackSection() {
   const submit = () => {
     if (!target) return
     setEntries((prev) => [
-      ...prev,
+      ...(prev ?? []),
       {
         id: `F${Date.now()}`,
         targetId: target.id,
@@ -70,7 +119,7 @@ export function FeedbackSection() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {targets.map((t) => {
+        {visibleTargets.map((t) => {
           const tEntries = entries.filter((e) => e.targetId === t.id)
           const avg = averageRating(tEntries)
           return (
@@ -149,7 +198,7 @@ export function FeedbackSection() {
       <Card>
         <SectionHeading title="Rating distribution" description="How ratings are spread across targets (average of 1–5)." />
         <div className="space-y-3">
-          {FEEDBACK_TARGETS.map((t) => {
+          {targets.map((t) => {
             const tEntries = entries.filter((e) => e.targetId === t.id)
             const avg = averageRating(tEntries)
             const pct = Math.round((avg / 5) * 100)

@@ -1,13 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Building2, CheckCircle2, FileText, GraduationCap, Search } from "lucide-react"
-import { PROGRAMS, ADMISSION_APPLICATIONS, type AdmissionApplication, type AdmissionStatus } from "@/lib/data/admissions"
-import { useLocalStorage } from "@/lib/storage"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { MockFileUpload } from "@/components/ui/mock-upload"
 import { cn } from "@/lib/utils"
+
+type Program = {
+  id: string
+  name: string
+  duration: string
+  seats: number
+  deadline: string
+  fee: number
+}
+
+type AdmissionStatus = "submitted" | "reviewing" | "accepted" | "rejected"
+
+type AdmissionApplication = {
+  id: string
+  applicantName: string
+  email: string
+  programId: string
+  programName: string
+  score: number
+  docs: string[]
+  status: AdmissionStatus
+  submittedAt: string
+  notes: string
+}
+
+const formatSubmittedAt = (value: string) => {
+  const d = new Date(value)
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+}
 
 const STATUS_PILL: Record<AdmissionStatus, string> = {
   submitted: "bg-primary/10 text-primary",
@@ -26,7 +55,10 @@ const STATUS_LABEL: Record<AdmissionStatus, string> = {
 type View = "apply" | "track"
 
 export default function ApplyPage() {
-  const [applications, setApplications] = useLocalStorage<AdmissionApplication[]>("flowdesk.admissions", ADMISSION_APPLICATIONS)
+  const [applications, setApplications] = useState<AdmissionApplication[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [programsLoading, setProgramsLoading] = useState(true)
+  const [programsError, setProgramsError] = useState("")
   const [view, setView] = useState<View>("apply")
 
   const [form, setForm] = useState({
@@ -40,26 +72,52 @@ export default function ApplyPage() {
   const [submittedId, setSubmittedId] = useState<string | null>(null)
   const [trackId, setTrackId] = useState("")
 
-  const submit = () => {
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/programs")
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load programmes"))))
+      .then((data) => {
+        if (!cancelled) setPrograms(Array.isArray(data.programs) ? data.programs : [])
+      })
+      .catch(() => {
+        if (!cancelled) setProgramsError("Could not load programmes. Please refresh.")
+      })
+      .finally(() => {
+        if (!cancelled) setProgramsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const submit = async () => {
     if (!form.name.trim() || !form.email.trim() || !form.programId) {
       setError("Name, email and programme are required.")
       return
     }
-    const program = PROGRAMS.find((p) => p.id === form.programId)
-    const app: AdmissionApplication = {
-      id: `APP-${Math.floor(2050 + Math.random() * 900)}`,
-      applicantName: form.name.trim(),
-      email: form.email.trim(),
-      programId: form.programId,
-      programName: program?.name ?? "",
-      score: Number(form.score) || 0,
-      docs: form.docs.filter(Boolean),
-      status: "submitted",
-      submittedAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-      notes: "",
+    setError("")
+    try {
+      const res = await fetch("/api/admissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicantName: form.name.trim(),
+          email: form.email.trim(),
+          programId: form.programId,
+          score: Number(form.score) || 0,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Something went wrong. Please try again.")
+        return
+      }
+      const app = data.application as AdmissionApplication
+      setApplications((prev) => [app, ...prev])
+      setSubmittedId(app.id)
+    } catch {
+      setError("Network error — please try again.")
     }
-    setApplications((prev) => [app, ...prev])
-    setSubmittedId(app.id)
   }
 
   const trackApp = trackId.trim()
@@ -143,7 +201,14 @@ export default function ApplyPage() {
               <Card className="lg:col-span-2">
                 <SectionHeading title="Programmes" description="2026 intake options." />
                 <div className="space-y-2">
-                  {PROGRAMS.map((p) => {
+                  {programsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading programmes…</p>
+                  ) : programsError ? (
+                    <p className="text-sm text-destructive">{programsError}</p>
+                  ) : programs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No programmes available.</p>
+                  ) : null}
+                  {programs.map((p) => {
                     const selected = form.programId === p.id
                     return (
                       <button
@@ -218,7 +283,7 @@ export default function ApplyPage() {
                     <GraduationCap className="h-4 w-4" aria-hidden /> Submit application
                   </button>
                   <p className="text-center text-xs text-muted-foreground">
-                    Demo application — data is stored in your browser and visible to the admin Admissions queue.
+                    Your application is stored in the campus database and visible to the admin Admissions queue.
                   </p>
                 </div>
               </Card>
@@ -233,7 +298,7 @@ export default function ApplyPage() {
                 <input
                   value={trackId}
                   onChange={(e) => setTrackId(e.target.value)}
-                  placeholder="e.g. APP-2041"
+                  placeholder="e.g. aa-1782500000000-abc123"
                   className={inputCls}
                 />
               </div>
@@ -242,7 +307,7 @@ export default function ApplyPage() {
                   <div className="rounded-xl bg-secondary/50 px-4 py-3">
                     <p className="font-semibold">{trackApp.applicantName}</p>
                     <p className="mt-1 font-mono text-xs text-muted-foreground">
-                      {trackApp.id} · {trackApp.programName} · Submitted {trackApp.submittedAt}
+                      {trackApp.id} · {trackApp.programName} · Submitted {formatSubmittedAt(trackApp.submittedAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">

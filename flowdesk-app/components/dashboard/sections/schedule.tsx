@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AlertTriangle, MapPin, Plus, User } from "lucide-react"
-import { SCHEDULE, STAFF, type Role, type ScheduleSlot } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -35,9 +34,39 @@ function findConflicts(schedule: ScheduleSlot[]): Conflict[] {
 }
 
 export function ScheduleSection({ role }: { role: Role }) {
-  const [schedule, setSchedule] = useLocalStorage<ScheduleSlot[]>("flowdesk.schedule", SCHEDULE)
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>([])
+  const [staff, setStaff] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [day, setDay] = useState<string>("Mon")
   const [tab, setTab] = useState<string>("routine")
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/schedule").then((r) => r.json()),
+      fetch("/api/directory").then((r) => r.json()),
+    ])
+      .then(([s, d]) => {
+        if (!alive) return
+        if (s?.error) {
+          setError(s.error)
+        } else {
+          setSchedule(s.schedule ?? [])
+        }
+        if (d?.error && !s?.error) setError(d.error)
+        else setStaff(d?.staff ?? [])
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+
   const byDay = (d: string) => schedule.filter((s) => s.day === d).sort((a, b) => a.start.localeCompare(b.start))
   const conflicts = findConflicts(schedule)
 
@@ -113,7 +142,7 @@ export function ScheduleSection({ role }: { role: Role }) {
 
       {tab === "conflicts" && <ConflictsView conflicts={conflicts} />}
 
-      {tab === "add" && <AddSlotView schedule={schedule} setSchedule={setSchedule} />}
+      {tab === "add" && <AddSlotView schedule={schedule} setSchedule={setSchedule} staff={staff} />}
     </div>
   )
 }
@@ -192,9 +221,11 @@ function ConflictsView({ conflicts }: { conflicts: Conflict[] }) {
 function AddSlotView({
   schedule,
   setSchedule,
+  staff,
 }: {
   schedule: ScheduleSlot[]
   setSchedule: React.Dispatch<React.SetStateAction<ScheduleSlot[]>>
+  staff: UserProfile[]
 }) {
   const modules = Array.from(new Map(schedule.map((s) => [s.code, s.module])).entries())
   const [form, setForm] = useState({
@@ -203,7 +234,7 @@ function AddSlotView({
     end: "10:30",
     code: "",
     room: "",
-    staff: STAFF[0]?.name ?? "",
+    staff: staff[0]?.name ?? "",
   })
   const [error, setError] = useState("")
   const [conflict, setConflict] = useState<string | null>(null)
@@ -284,7 +315,7 @@ function AddSlotView({
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Faculty</label>
               <select value={form.staff} onChange={(e) => setForm((f) => ({ ...f, staff: e.target.value }))} className={inputCls}>
-                {STAFF.map((s) => (
+                {staff.map((s) => (
                   <option key={s.id} value={s.name}>{s.name}</option>
                 ))}
               </select>

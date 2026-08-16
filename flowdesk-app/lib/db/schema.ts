@@ -45,8 +45,10 @@ export function createSchema(db: DatabaseSync) {
       body TEXT NOT NULL,
       time TEXT NOT NULL,
       category TEXT NOT NULL,
-      unread INTEGER NOT NULL DEFAULT 1
+      unread INTEGER NOT NULL DEFAULT 1,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 
     CREATE TABLE IF NOT EXISTS schedule_slots (
       id TEXT PRIMARY KEY,

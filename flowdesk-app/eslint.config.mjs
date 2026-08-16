@@ -2,7 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config"
 import nextVitals from "eslint-config-next/core-web-vitals"
 import nextTs from "eslint-config-next/typescript"
 
-// Paths that may only be read by the seed module and the temporary shims.
+// Paths that may only be read by the seed module.
 // Type-only imports are allowed everywhere so components can share types
 // without pulling in mock values.
 const SEED_PATHS = [
@@ -35,10 +35,9 @@ const seedBan = {
   },
 }
 
-// The seeder and the migration shims are the only files allowed to read values
-// from lib/seed-data.
+// The seeder is the only file allowed to read values from lib/seed-data.
 const seedBanAllowlist = {
-  files: ["lib/db/seed.ts", "lib/mock-data.ts", "lib/data/*.ts"],
+  files: ["lib/db/seed.ts"],
   rules: {
     "no-restricted-imports": "off",
   },

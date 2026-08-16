@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BookOpen, CalendarHeart, TriangleAlert, Cog, Check } from "lucide-react"
-import { NOTIFICATIONS, type NotificationItem } from "@/lib/mock-data"
+import type { NotificationItem } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
@@ -19,14 +19,40 @@ const CATEGORY_META: Record<
 const FILTERS = ["all", "academic", "event", "alert", "system"] as const
 
 export function NotificationsSection() {
-  const [items, setItems] = useState<NotificationItem[]>(NOTIFICATIONS)
+  const [items, setItems] = useState<NotificationItem[] | null>(null)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return
+        if (d?.error) setError(d.error)
+        else setItems(d.notifications ?? [])
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!items) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   const visible = filter === "all" ? items : items.filter((n) => n.category === filter)
   const unread = items.filter((n) => n.unread).length
 
-  const markAllRead = () => setItems((prev) => prev.map((n) => ({ ...n, unread: false })))
-  const toggle = (id: string) => setItems((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)))
+  const markAllRead = () => {
+    setItems((prev) => (prev ?? []).map((n) => ({ ...n, unread: false })))
+    fetch("/api/notifications", { method: "POST" }).catch(() => {})
+  }
+  const toggle = (id: string) =>
+    setItems((prev) => (prev ?? []).map((n) => (n.id === id ? { ...n, unread: false } : n)))
 
   return (
     <div className="space-y-6">

@@ -1,16 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CalendarClock, CheckCircle2, FileText, Paperclip, Plus, Trash2 } from "lucide-react"
-import { ASSIGNMENTS, SUBMISSIONS, daysUntil, type Assignment, type Submission } from "@/lib/data/assignments"
-import { SCHEDULE, type Role } from "@/lib/mock-data"
-import { DEMO_USERS } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { Modal } from "@/components/ui/modal"
 import { MockFileUpload } from "@/components/ui/mock-upload"
 import { cn } from "@/lib/utils"
+
+type Assignment = {
+  id: string
+  moduleCode: string
+  moduleName: string
+  title: string
+  description: string
+  assignedDate: string
+  dueDate: string
+  maxMarks: number
+}
+
+type Submission = {
+  id: string
+  assignmentId: string
+  studentId: string
+  studentName: string
+  submittedAt: string
+  fileName: string
+  marks: number | null
+  feedback: string
+}
+
+function daysUntil(dueDate: string): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(`${dueDate}T00:00:00`)
+  return Math.round((due.getTime() - today.getTime()) / 86400000)
+}
 
 const TABS: TabItem[] = [
   { id: "mytasks", label: "My tasks" },
@@ -19,9 +45,51 @@ const TABS: TabItem[] = [
 ]
 
 export function AssignmentsSection({ role }: { role: Role }) {
-  const [assignments, setAssignments] = useLocalStorage<Assignment[]>("flowdesk.assignments", ASSIGNMENTS)
-  const [submissions, setSubmissions] = useLocalStorage<Submission[]>("flowdesk.submissions", SUBMISSIONS)
+  const [assignments, setAssignments] = useState<Assignment[] | null>(null)
+  const [submissions, setSubmissions] = useState<Submission[] | null>(null)
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [modules, setModules] = useState<[string, string][]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>(role === "student" ? "mytasks" : "submissions")
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/assignments").then((r) => r.json()),
+      fetch("/api/schedule").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([a, s, m]) => {
+        if (!alive) return
+        if (a?.error) setError(a.error)
+        else {
+          setAssignments(a.assignments ?? [])
+          setSubmissions(a.submissions ?? [])
+        }
+        if (s?.schedule) {
+          setModules(
+            Array.from(new Map((s.schedule as ScheduleSlot[]).map((slot) => [slot.code, slot.module])).entries()),
+          )
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !a?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!assignments || !submissions || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  const setSubmissionsSafe: React.Dispatch<React.SetStateAction<Submission[]>> = (updater) =>
+    setSubmissions((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
+  const setAssignmentsSafe: React.Dispatch<React.SetStateAction<Assignment[]>> = (updater) =>
+    setAssignments((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
 
   return (
     <div className="space-y-6">
@@ -35,14 +103,15 @@ export function AssignmentsSection({ role }: { role: Role }) {
         <MyTasks
           assignments={assignments}
           submissions={submissions}
-          setSubmissions={setSubmissions}
+          setSubmissions={setSubmissionsSafe}
+          me={me}
         />
       )}
       {tab === "submissions" && role !== "student" && (
-        <GradeSubmissions assignments={assignments} submissions={submissions} setSubmissions={setSubmissions} />
+        <GradeSubmissions assignments={assignments} submissions={submissions} setSubmissions={setSubmissionsSafe} />
       )}
       {tab === "manage" && role !== "student" && (
-        <ManageAssignments assignments={assignments} setAssignments={setAssignments} />
+        <ManageAssignments assignments={assignments} setAssignments={setAssignmentsSafe} modules={modules} />
       )}
     </div>
   )
@@ -52,12 +121,13 @@ function MyTasks({
   assignments,
   submissions,
   setSubmissions,
+  me,
 }: {
   assignments: Assignment[]
   submissions: Submission[]
   setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>
+  me: UserProfile
 }) {
-  const me = DEMO_USERS.student
   const [uploadFor, setUploadFor] = useState<Assignment | null>(null)
   const [fileName, setFileName] = useState("")
 
@@ -273,11 +343,12 @@ function GradeSubmissions({
 function ManageAssignments({
   assignments,
   setAssignments,
+  modules,
 }: {
   assignments: Assignment[]
   setAssignments: React.Dispatch<React.SetStateAction<Assignment[]>>
+  modules: [string, string][]
 }) {
-  const modules = Array.from(new Map(SCHEDULE.map((s) => [s.code, s.module])).entries())
   const [form, setForm] = useState({
     moduleCode: "",
     moduleName: "",

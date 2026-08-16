@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CheckCircle2, Clock, Fingerprint, ScanLine } from "lucide-react"
-import { CHECK_INS, type CheckInRecord, type Role } from "@/lib/mock-data"
+import type { CheckInRecord, Role } from "@/lib/seed-data/core"
 import { BiometricScanner } from "@/components/biometric-scanner"
 import { Card, RoleBadge, SectionHeading, StatusBadge } from "@/components/dashboard/primitives"
 
@@ -10,25 +10,50 @@ function nowTime() {
   return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
 }
 
-export function CheckInSection({ role, userName }: { role: Role; userName: string }) {
-  const [records, setRecords] = useState<CheckInRecord[]>(CHECK_INS)
+export function CheckInSection({ userName }: { role: Role; userName: string }) {
+  const [records, setRecords] = useState<CheckInRecord[]>([])
   const [checkedIn, setCheckedIn] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleVerified = (method: "webauthn" | "biometric") => {
+  useEffect(() => {
+    let alive = true
+    fetch("/api/checkins")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return
+        if (j?.error) setError(j.error)
+        else setRecords(j?.records ?? [])
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleVerified = async (method: "webauthn" | "biometric") => {
     if (checkedIn) return
     setCheckedIn(true)
-    setRecords((prev) => [
-      {
-        id: `me-${Date.now()}`,
-        name: userName,
-        role,
-        time: nowTime(),
-        status: "on-time",
-        method,
-      },
-      ...prev,
-    ])
+    try {
+      const res = await fetch("/api/checkins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      })
+      const data = await res.json()
+      if (data?.record) {
+        setRecords((prev) => [data.record, ...prev])
+      } else if (data?.error) {
+        setError(data.error)
+      }
+    } catch {
+      setError("Check-in failed")
+    }
   }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
 
   const present = records.filter((r) => r.status !== "absent").length
   const late = records.filter((r) => r.status === "late").length

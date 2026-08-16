@@ -1,11 +1,46 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CheckCircle2, FileText, UserPlus, XCircle } from "lucide-react"
-import { ADMISSION_APPLICATIONS, PROGRAMS, nextAdmissionStatus, type AdmissionApplication, type AdmissionStatus } from "@/lib/data/admissions"
-import { useLocalStorage } from "@/lib/storage"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
+
+type AdmissionStatus = "submitted" | "reviewing" | "accepted" | "rejected"
+
+type AdmissionApplication = {
+  id: string
+  programId: string
+  programName: string
+  applicantName: string
+  email: string
+  submittedAt: string
+  status: AdmissionStatus
+  docs: string[]
+  score: number
+  notes: string
+}
+
+type Program = {
+  id: string
+  name: string
+  fee: number
+}
+
+function nextAdmissionStatus(status: AdmissionStatus): AdmissionStatus | null {
+  if (status === "submitted") return "reviewing"
+  if (status === "reviewing") return "accepted"
+  return null
+}
+
+function normalizeDocs(docs: string[] | string): string[] {
+  if (Array.isArray(docs)) return docs
+  try {
+    const parsed = JSON.parse(docs)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 const STATUS_BADGE: Record<AdmissionStatus, string> = {
   submitted: "pill bg-primary/10 text-primary",
@@ -22,9 +57,38 @@ const STATUS_LABEL: Record<AdmissionStatus, string> = {
 }
 
 export function AdmissionsSection() {
-  const [applications, setApplications] = useLocalStorage<AdmissionApplication[]>("flowdesk.admissions", ADMISSION_APPLICATIONS)
+  const [applications, setApplications] = useState<AdmissionApplication[] | null>(null)
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | AdmissionStatus>("all")
   const [notes, setNotes] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/admissions")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return
+        if (d?.error) setError(d.error)
+        else {
+          setApplications(
+            (d.applications ?? []).map((a: AdmissionApplication) => ({ ...a, docs: normalizeDocs(a.docs) })),
+          )
+          setPrograms(d.programs ?? [])
+        }
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!applications) return <p className="text-sm text-muted-foreground">Loading…</p>
+
   const list = applications.filter((a) => filter === "all" || a.status === filter)
 
   const counts = {
@@ -35,7 +99,7 @@ export function AdmissionsSection() {
 
   const setStatus = (id: string, status: AdmissionStatus, note?: string) =>
     setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status, notes: note !== undefined ? note : a.notes } : a)),
+      (prev ?? []).map((a) => (a.id === id ? { ...a, status, notes: note !== undefined ? note : a.notes } : a)),
     )
 
   const advance = (a: AdmissionApplication) => {
@@ -74,7 +138,7 @@ export function AdmissionsSection() {
 
       <div className="space-y-4">
         {list.map((a) => {
-          const program = PROGRAMS.find((p) => p.id === a.programId)
+          const program = programs.find((p) => p.id === a.programId)
           return (
             <Card key={a.id} className="flex flex-col gap-4">
               <div className="flex flex-wrap items-start gap-4">

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowRight, Building2, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { ADMIN_CREDS } from "@/lib/mock-data"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function LoginPage() {
@@ -133,8 +132,8 @@ export default function LoginPage() {
               </li>
               <li>
                 <span className="font-medium text-foreground">Admin</span> —{" "}
-                <span className="font-mono">{ADMIN_CREDS.email}</span> /{" "}
-                <span className="font-mono">{ADMIN_CREDS.password}</span>
+                <span className="font-mono">admin@flowdesk.edu</span> /{" "}
+                <span className="font-mono">flowdesk-admin@2026</span>
               </li>
             </ul>
           </div>

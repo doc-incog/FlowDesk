@@ -1,13 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MessageSquare, Plus, Send } from "lucide-react"
-import { COMPLAINTS, COMPLAINT_CATEGORIES, type Complaint, type ComplaintCategory, type ComplaintStatus } from "@/lib/data/helpdesk"
-import { DEMO_USERS, type Role } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { Role, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+
+type ComplaintCategory = "Academics" | "Hostel" | "Library" | "IT" | "Transport" | "Other"
+type ComplaintStatus = "open" | "in-progress" | "resolved"
+
+type Complaint = {
+  id: string
+  category: string
+  subject: string
+  description: string
+  status: ComplaintStatus
+  createdAt: string
+  raisedByName: string
+  raisedByRole: Role
+  comments: string[]
+}
+
+const COMPLAINT_CATEGORIES: ComplaintCategory[] = ["Academics", "Hostel", "Library", "IT", "Transport", "Other"]
+
+function normalizeComments(comments: unknown[]): string[] {
+  return comments
+    .map((c) => {
+      if (typeof c === "string") return c
+      const author = (c as { author?: string })?.author ?? ""
+      const text = (c as { text?: string })?.text ?? ""
+      return author ? `${author}: ${text}` : text
+    })
+    .filter(Boolean)
+}
 
 const TABS: TabItem[] = [
   { id: "all", label: "All tickets" },
@@ -28,9 +54,42 @@ const STATUS_LABEL: Record<ComplaintStatus, string> = {
 }
 
 export function HelpdeskSection({ role }: { role: Role }) {
-  const [complaints, setComplaints] = useLocalStorage<Complaint[]>("flowdesk.complaints", COMPLAINTS)
+  const [complaints, setComplaints] = useState<Complaint[] | null>(null)
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("all")
-  const me = DEMO_USERS[role]
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/complaints").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([c, m]) => {
+        if (!alive) return
+        if (c?.error) setError(c.error)
+        else {
+          setComplaints(
+            (c.complaints ?? []).map((x: Complaint) => ({ ...x, comments: normalizeComments(x.comments) })),
+          )
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !c?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!complaints || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  const setComplaintsSafe: React.Dispatch<React.SetStateAction<Complaint[]>> = (updater) =>
+    setComplaints((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
 
   return (
     <div className="space-y-6">
@@ -40,7 +99,7 @@ export function HelpdeskSection({ role }: { role: Role }) {
       />
       <SectionTabs tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === "new" && <NewComplaint onCreated={() => setTab("mine")} role={role} setComplaints={setComplaints} />}
+      {tab === "new" && <NewComplaint onCreated={() => setTab("mine")} role={role} me={me} setComplaints={setComplaintsSafe} />}
 
       {tab !== "new" && (
         <div className="space-y-4">
@@ -51,7 +110,8 @@ export function HelpdeskSection({ role }: { role: Role }) {
                 key={c.id}
                 complaint={c}
                 canUpdate={role !== "student" || c.raisedByName === me.name}
-                setComplaints={setComplaints}
+                me={me}
+                setComplaints={setComplaintsSafe}
               />
             ))}
           {complaints.filter((c) => (tab === "mine" ? c.raisedByName === me.name : true)).length === 0 && (
@@ -68,13 +128,14 @@ export function HelpdeskSection({ role }: { role: Role }) {
 function NewComplaint({
   onCreated,
   role,
+  me,
   setComplaints,
 }: {
   onCreated: () => void
   role: Role
+  me: UserProfile
   setComplaints: React.Dispatch<React.SetStateAction<Complaint[]>>
 }) {
-  const me = DEMO_USERS[role]
   const [category, setCategory] = useState<ComplaintCategory>("Academics")
   const [subject, setSubject] = useState("")
   const [description, setDescription] = useState("")
@@ -155,10 +216,12 @@ function NewComplaint({
 function ComplaintCard({
   complaint,
   canUpdate,
+  me,
   setComplaints,
 }: {
   complaint: Complaint
   canUpdate: boolean
+  me: UserProfile
   setComplaints: React.Dispatch<React.SetStateAction<Complaint[]>>
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -166,11 +229,10 @@ function ComplaintCard({
 
   const addComment = () => {
     if (!comment.trim()) return
-    const at = new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === complaint.id
-          ? { ...c, comments: [...c.comments, { id: `cc${Date.now()}`, author: DEMO_USERS.admin.name, text: comment.trim(), at }] }
+          ? { ...c, comments: [...c.comments, `${me.name}: ${comment.trim()}`] }
           : c,
       ),
     )
@@ -206,12 +268,8 @@ function ComplaintCard({
         {expanded && (
           <div className="mt-3 space-y-3">
             {complaint.comments.map((cm) => (
-              <div key={cm.id} className="rounded-md border border-border bg-secondary/50 px-3.5 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{cm.author}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{cm.at}</span>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">{cm.text}</p>
+              <div key={cm} className="rounded-md border border-border bg-secondary/50 px-3.5 py-2.5">
+                <p className="text-sm text-muted-foreground">{cm}</p>
               </div>
             ))}
 

@@ -1,15 +1,46 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Award, CheckCircle2, Clock, FileText, Plus, XCircle } from "lucide-react"
-import { SCHOLARSHIPS, SCHOLARSHIP_APPLICATIONS, type Scholarship, type ScholarshipApplication, type ScholarshipStatus } from "@/lib/data/scholarships"
-import { DEMO_USERS, type Role } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { Role, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { Modal } from "@/components/ui/modal"
 import { MockFileUpload } from "@/components/ui/mock-upload"
 import { cn } from "@/lib/utils"
+
+type Scholarship = {
+  id: string
+  name: string
+  provider: string
+  amount: number
+  eligibility: string
+  seats: number
+  deadline: string
+  description: string
+}
+
+type ScholarshipStatus = "submitted" | "under-review" | "approved" | "rejected"
+
+type ScholarshipApplication = {
+  id: string
+  scholarshipId: string
+  studentId: string
+  studentName: string
+  status: ScholarshipStatus
+  submittedAt: string
+  docs: string[]
+}
+
+function normalizeDocs(docs: string[] | string): string[] {
+  if (Array.isArray(docs)) return docs
+  try {
+    const parsed = JSON.parse(docs)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 const TABS: TabItem[] = [
   { id: "browse", label: "Browse & apply" },
@@ -31,12 +62,46 @@ const STATUS_LABEL: Record<ScholarshipStatus, string> = {
 }
 
 export function ScholarshipsSection({ role }: { role: Role }) {
-  const [applications, setApplications] = useLocalStorage<ScholarshipApplication[]>("flowdesk.scholarships", SCHOLARSHIP_APPLICATIONS)
+  const [scholarships, setScholarships] = useState<Scholarship[]>([])
+  const [applications, setApplications] = useState<ScholarshipApplication[]>([])
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("browse")
   const [applyTarget, setApplyTarget] = useState<Scholarship | null>(null)
   const [docNames, setDocNames] = useState<string[]>([])
   const [applied, setApplied] = useState(false)
   const isStudent = role === "student"
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/scholarships").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([s, m]) => {
+        if (!alive) return
+        if (s?.error) {
+          setError(s.error)
+        } else {
+          setScholarships(s.scholarships ?? [])
+          setApplications(
+            (s.applications ?? []).map((a: ScholarshipApplication) => ({ ...a, docs: normalizeDocs(a.docs) })),
+          )
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !s?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   const openApply = (s: Scholarship) => {
     setApplyTarget(s)
@@ -50,8 +115,8 @@ export function ScholarshipsSection({ role }: { role: Role }) {
       {
         id: `SA-${Date.now()}`,
         scholarshipId: applyTarget.id,
-        studentId: DEMO_USERS.student.id,
-        studentName: DEMO_USERS.student.name,
+        studentId: me.id,
+        studentName: me.name,
         status: "submitted",
         submittedAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
         docs: docNames.filter(Boolean),
@@ -62,7 +127,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
   }
 
   if (role === "admin") {
-    return <AdminScholarships applications={applications} setApplications={setApplications} />
+    return <AdminScholarships applications={applications} setApplications={setApplications} scholarships={scholarships} />
   }
 
   return (
@@ -75,12 +140,12 @@ export function ScholarshipsSection({ role }: { role: Role }) {
 
       {tab === "browse" ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {SCHOLARSHIPS.map((s) => (
+          {scholarships.map((s) => (
             <ScholarshipCard key={s.id} s={s} canApply={isStudent} onApply={() => openApply(s)} />
           ))}
         </div>
       ) : (
-        <StudentApplications applications={applications} />
+        <StudentApplications applications={applications} scholarships={scholarships} me={me} />
       )}
       {!isStudent && (
         <p className="text-sm text-muted-foreground">
@@ -165,8 +230,15 @@ function ScholarshipCard({ s, canApply, onApply }: { s: Scholarship; canApply: b
   )
 }
 
-function StudentApplications({ applications }: { applications: ScholarshipApplication[] }) {
-  const me = DEMO_USERS.student
+function StudentApplications({
+  applications,
+  scholarships,
+  me,
+}: {
+  applications: ScholarshipApplication[]
+  scholarships: Scholarship[]
+  me: UserProfile
+}) {
   const mine = applications.filter((a) => a.studentId === me.id)
 
   if (mine.length === 0) {
@@ -180,7 +252,7 @@ function StudentApplications({ applications }: { applications: ScholarshipApplic
   return (
     <div className="space-y-3">
       {mine.map((a) => {
-        const s = SCHOLARSHIPS.find((x) => x.id === a.scholarshipId)
+        const s = scholarships.find((x) => x.id === a.scholarshipId)
         return (
           <Card key={a.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
@@ -202,9 +274,11 @@ function StudentApplications({ applications }: { applications: ScholarshipApplic
 function AdminScholarships({
   applications,
   setApplications,
+  scholarships,
 }: {
   applications: ScholarshipApplication[]
   setApplications: React.Dispatch<React.SetStateAction<ScholarshipApplication[]>>
+  scholarships: Scholarship[]
 }) {
   const [filter, setFilter] = useState<"all" | ScholarshipStatus>("all")
   const list = applications.filter((a) => filter === "all" || a.status === filter)
@@ -246,7 +320,7 @@ function AdminScholarships({
 
       <div className="space-y-3">
         {list.map((a) => {
-          const s = SCHOLARSHIPS.find((x) => x.id === a.scholarshipId)
+          const s = scholarships.find((x) => x.id === a.scholarshipId)
           return (
             <Card key={a.id} className="flex flex-col gap-4 lg:flex-row lg:items-center">
               <div className="min-w-0 flex-1">

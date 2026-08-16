@@ -6,6 +6,8 @@
   runtime reads and writes go through this database via the API.
 - **Seed data (mock):** `lib/seed-data/` — one directory that holds the entire
   demo dataset (users, schedule, fees, exams, admissions, complaints, etc.).
+- **Static copy (not DB data):** the chat assistant's FAQ/suggestions are
+  simulated copy and live in `lib/chat-content.ts` (no DB dependency).
 
 ## Guarantees
 
@@ -18,15 +20,13 @@
    (see `.env.example`). `SEED=false` skips seeding. Seeding only runs when the
    `users` table is empty, so restarts never duplicate or overwrite rows.
 
-> **Transition shims:** during migration `lib/mock-data.ts` and `lib/data/*`
-> still re-export seed-data so existing views keep compiling. These shims are
-> deleted as each view is wired to the API.
+Mock data removal is complete: `lib/mock-data.ts` and `lib/data/` are deleted,
+and the chat content moved to `lib/chat-content.ts`.
 
 ## Going to production (removing mocks)
 
 1. Set `SEED=false` (or delete `.data/flowdesk.db`).
-2. Delete the `lib/seed-data/` directory (and the `lib/mock-data.ts` /
-   `lib/data/` shims once no view imports them).
+2. Delete the `lib/seed-data/` directory (it is only read by the seeder).
 3. Point users/data provisioning at your real source — the API and DB layer
    are unchanged.
 

@@ -17,7 +17,7 @@ import { COMPLAINTS } from "@/lib/seed-data/helpdesk"
 import { SCHOLARSHIPS, SCHOLARSHIP_APPLICATIONS } from "@/lib/seed-data/scholarships"
 import { FEEDBACK_ENTRIES, FEEDBACK_TARGETS } from "@/lib/seed-data/feedback"
 import { hashPassword } from "@/lib/db/password"
-import { localDateTime } from "@/lib/datetime"
+import { localDate, localDateTime } from "@/lib/datetime"
 
 /**
  * Seeds the database from the isolated mock dataset in lib/seed-data.
@@ -102,8 +102,16 @@ export function seedDatabase(db: DatabaseSync) {
     ...MENTORS.map((m) => [m.id, m.name, m.designation, m.department, m.email, m.phone, m.office, m.officeHours, m.avatarInitials, m.mentees]),
   ])
 
-  insert("INSERT INTO notifications (id,title,body,time,category,unread) VALUES (?,?,?,?,?,?)", [
-    ...NOTIFICATIONS.map((n) => [n.id, n.title, n.body, n.time, n.category, n.unread ? 1 : 0]),
+  // Notification targeting: user_id = specific user, NULL = campus-wide broadcast.
+  const notificationOwner: Record<string, string | null> = {
+    n1: DEMO_USERS.student.id,
+    n2: null,
+    n3: null,
+    n4: DEMO_USERS.student.id,
+  }
+
+  insert("INSERT INTO notifications (id,title,body,time,category,unread,user_id) VALUES (?,?,?,?,?,?,?)", [
+    ...NOTIFICATIONS.map((n) => [n.id, n.title, n.body, n.time, n.category, n.unread ? 1 : 0, notificationOwner[n.id] ?? null]),
   ])
 
   insert("INSERT INTO schedule_slots (id,day,start,end,module,code,room,staff) VALUES (?,?,?,?,?,?,?,?)", [
@@ -128,6 +136,58 @@ export function seedDatabase(db: DatabaseSync) {
       localDateTime(),
     ]),
   ])
+
+  // Deterministic attendance history (~30 weekdays back) so overview stats and
+  // the staff check-in log have realistic depth. Re-seeding is stable because
+  // the pseudo-random pattern depends only on day + student indices.
+  const attendancePct: Record<string, number> = {
+    [DEMO_USERS.student.id]: 92,
+    "STU-2044": 88,
+    "STU-2045": 76,
+    "STU-2046": 64,
+    "STU-2047": 82,
+  }
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const clock12 = (minutesFromMidnight: number) =>
+    new Date(0, 0, 0, Math.floor(minutesFromMidnight / 60), minutesFromMidnight % 60).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+
+  const insertHistory = db.prepare(
+    "INSERT INTO check_ins (id,user_id,name,role,time,status,method,device_id,source,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  )
+  const history = new Date()
+  for (let back = 1; back <= 40; back++) {
+    const day = new Date(history)
+    day.setDate(history.getDate() - back)
+    const dow = day.getDay()
+    if (dow === 0 || dow === 6) continue
+    STUDENTS.forEach((student, sIdx) => {
+      const pct = attendancePct[student.id] ?? 85
+      const hash = ((back * 7 + sIdx * 13) % 100) + 1
+      if (hash > pct) {
+        insertHistory.run(`ch-${student.id}-${back}`, student.id, student.name, "student", "—", "absent", "manual", null, "web", `${localDate(day)} 00:00:00`)
+        return
+      }
+      const minutes = 480 + (((back * 17 + sIdx * 11) % 95) + 5)
+      const late = minutes > 540
+      const clock = clock12(minutes)
+      const method = sIdx % 2 === 0 ? "biometric" : "webauthn"
+      insertHistory.run(
+        `ch-${student.id}-${back}`,
+        student.id,
+        student.name,
+        "student",
+        clock,
+        late ? "late" : "on-time",
+        method,
+        null,
+        "web",
+        `${localDate(day)} ${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}:00`,
+      )
+    })
+  }
 
   insert("INSERT INTO fee_items (id,student_id,name,amount,due_date,status,paid_date,method,receipt_id) VALUES (?,?,?,?,?,?,?,?,?)", [
     ...FEE_STRUCTURE.map((f) => [f.id, DEMO_USERS.student.id, f.name, f.amount, f.dueDate, f.status, f.paidDate ?? null, f.method ?? null, f.receiptId ?? null]),

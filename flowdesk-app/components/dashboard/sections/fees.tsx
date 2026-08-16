@@ -1,15 +1,48 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BadgeCheck, Banknote, CheckCircle2, Download, Landmark, Lock, Receipt as ReceiptIcon, Smartphone, Wallet, CreditCard } from "lucide-react"
-import { FEE_STRUCTURE, RECEIPTS, METHOD_LABEL, formatINR, type FeeItem, type PaymentMethod, type Receipt } from "@/lib/data/fees"
-import { DEMO_USERS } from "@/lib/mock-data"
-import { useLocalStorage } from "@/lib/storage"
+import type { UserProfile } from "@/lib/seed-data/core"
 import { downloadHtml } from "@/lib/download"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { Modal } from "@/components/ui/modal"
 import { cn } from "@/lib/utils"
+
+type PaymentMethod = "upi" | "card" | "netbanking" | "cash"
+
+type FeeItem = {
+  id: string
+  name: string
+  amount: number
+  dueDate: string
+  status: "paid" | "pending"
+  paidDate?: string
+  method?: PaymentMethod
+  receiptId?: string
+}
+
+type Receipt = {
+  id: string
+  studentId: string
+  studentName: string
+  itemName: string
+  amount: number
+  date: string
+  method: PaymentMethod
+  transactionId: string
+}
+
+function formatINR(n: number): string {
+  return `₹${n.toLocaleString("en-IN")}`
+}
+
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  upi: "UPI",
+  card: "Card",
+  netbanking: "Net Banking",
+  cash: "Cash",
+}
 
 const TABS: TabItem[] = [
   { id: "dues", label: "Fee dues" },
@@ -23,15 +56,44 @@ const METHODS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
 ]
 
 export function FeesSection() {
-  const [fees, setFees] = useLocalStorage<FeeItem[]>("flowdesk.fees", FEE_STRUCTURE)
-  const [receipts, setReceipts] = useLocalStorage<Receipt[]>("flowdesk.receipts", RECEIPTS)
+  const [fees, setFees] = useState<FeeItem[] | null>(null)
+  const [receipts, setReceipts] = useState<Receipt[] | null>(null)
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("dues")
   const [paying, setPaying] = useState<FeeItem | null>(null)
   const [step, setStep] = useState<"method" | "processing" | "success">("method")
   const [method, setMethod] = useState<PaymentMethod>("upi")
   const [newReceipt, setNewReceipt] = useState<Receipt | null>(null)
 
-  const me = DEMO_USERS.student
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/fees").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([f, m]) => {
+        if (!alive) return
+        if (f?.error) setError(f.error)
+        else {
+          setFees(f.feeStructure ?? [])
+          setReceipts(f.receipts ?? [])
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !f?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!fees || !receipts || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+
   const pending = fees.filter((f) => f.status === "pending")
   const paid = fees.filter((f) => f.status === "paid")
   const totalDue = pending.reduce((s, f) => s + f.amount, 0)
@@ -59,7 +121,7 @@ export function FeesSection() {
         transactionId: `TXN-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
       }
       setFees((prev) =>
-        prev.map((f) =>
+        (prev ?? []).map((f) =>
           f.id === paying.id
             ? {
                 ...f,
@@ -71,7 +133,7 @@ export function FeesSection() {
             : f,
         ),
       )
-      setReceipts((prev) => [receipt, ...prev])
+      setReceipts((prev) => [receipt, ...(prev ?? [])])
       setNewReceipt(receipt)
       setStep("success")
     }, 1800)

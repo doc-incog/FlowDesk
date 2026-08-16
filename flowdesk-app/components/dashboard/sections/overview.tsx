@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Fingerprint,
   Users,
@@ -11,13 +12,7 @@ import {
   ArrowRight,
   UserRound,
 } from "lucide-react"
-import {
-  CAMPUS_STATS,
-  NOTIFICATIONS,
-  SCHEDULE,
-  STUDENTS,
-  type Role,
-} from "@/lib/mock-data"
+import type { NotificationItem, Role, ScheduleSlot } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard, StatusBadge } from "@/components/dashboard/primitives"
 import type { SectionId } from "@/components/dashboard/shell"
 
@@ -28,9 +23,62 @@ const GREETING = () => {
   return "Good evening"
 }
 
+type OverviewStat = {
+  label: string
+  value: string | number
+  hint?: string
+  tone: "primary" | "chart-5" | "success" | "warning"
+  icon: "graduation" | "users" | "shield" | "fingerprint" | "user" | "calendar" | "bell" | "trending"
+}
+
+type RecentCheckIn = {
+  name: string
+  rollNo: string
+  time: string
+  status: "on-time" | "late"
+}
+
+type OverviewData = {
+  stats: OverviewStat[]
+  todaysClasses: ScheduleSlot[]
+  notices: NotificationItem[]
+  recentCheckIns: RecentCheckIn[]
+}
+
+const STAT_ICONS: Record<OverviewStat["icon"], React.ReactNode> = {
+  graduation: <GraduationCap className="h-5 w-5" />,
+  users: <Users className="h-5 w-5" />,
+  shield: <ShieldCheck className="h-5 w-5" />,
+  fingerprint: <Fingerprint className="h-5 w-5" />,
+  user: <UserRound className="h-5 w-5" />,
+  calendar: <CalendarClock className="h-5 w-5" />,
+  bell: <Bell className="h-5 w-5" />,
+  trending: <TrendingUp className="h-5 w-5" />,
+}
+
 export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: (s: SectionId) => void }) {
-  const todaysClasses = SCHEDULE.filter((s) => s.day === "Mon")
-  const unread = NOTIFICATIONS.filter((n) => n.unread)
+  const [data, setData] = useState<OverviewData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/overview")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return
+        if (j?.error) setError(j.error)
+        else setData(j)
+      })
+      .catch(() => alive && setError("Failed to load"))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  const { stats, todaysClasses, notices, recentCheckIns } = data
 
   return (
     <div className="space-y-6">
@@ -41,30 +89,9 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
 
       {/* Stats — role aware */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {role === "admin" && (
-          <>
-            <StatCard label="Total students" value={CAMPUS_STATS.totalStudents.toLocaleString()} icon={<GraduationCap className="h-5 w-5" />} tone="primary" />
-            <StatCard label="Total staff" value={CAMPUS_STATS.totalStaff} icon={<Users className="h-5 w-5" />} tone="chart-5" />
-            <StatCard label="Present today" value={CAMPUS_STATS.presentToday.toLocaleString()} hint={`${CAMPUS_STATS.avgAttendance}% attendance`} icon={<ShieldCheck className="h-5 w-5" />} tone="success" />
-            <StatCard label="Biometric devices" value={`${CAMPUS_STATS.devicesOnline}/${CAMPUS_STATS.biometricDevices}`} hint="online" icon={<Fingerprint className="h-5 w-5" />} tone="warning" />
-          </>
-        )}
-        {role === "staff" && (
-          <>
-            <StatCard label="My mentees" value={12} icon={<UserRound className="h-5 w-5" />} tone="primary" />
-            <StatCard label="Classes today" value={todaysClasses.length} icon={<CalendarClock className="h-5 w-5" />} tone="chart-5" />
-            <StatCard label="Present today" value={`${CAMPUS_STATS.avgAttendance}%`} hint="across your modules" icon={<ShieldCheck className="h-5 w-5" />} tone="success" />
-            <StatCard label="Unread alerts" value={unread.length} icon={<Bell className="h-5 w-5" />} tone="warning" />
-          </>
-        )}
-        {role === "student" && (
-          <>
-            <StatCard label="My attendance" value="92%" hint="this semester" icon={<TrendingUp className="h-5 w-5" />} tone="success" />
-            <StatCard label="Classes today" value={todaysClasses.length} icon={<CalendarClock className="h-5 w-5" />} tone="primary" />
-            <StatCard label="Check-in status" value="Done" hint="08:42 AM · on time" icon={<Fingerprint className="h-5 w-5" />} tone="chart-5" />
-            <StatCard label="Unread notices" value={unread.length} icon={<Bell className="h-5 w-5" />} tone="warning" />
-          </>
-        )}
+        {stats.map((s) => (
+          <StatCard key={s.label} label={s.label} value={s.value} hint={s.hint} tone={s.tone} icon={STAT_ICONS[s.icon]} />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -117,7 +144,7 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
           <Card>
             <SectionHeading title="Latest notices" />
             <ul className="space-y-3">
-              {unread.slice(0, 3).map((n) => (
+              {notices.slice(0, 3).map((n) => (
                 <li key={n.id} className="flex gap-3">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
                   <div className="min-w-0">
@@ -142,15 +169,15 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
             }
           />
           <ul className="divide-y divide-border">
-            {STUDENTS.slice(0, 4).map((st, i) => (
-              <li key={st.id} className="flex items-center justify-between py-2.5">
+            {recentCheckIns.map((st) => (
+              <li key={`${st.name}-${st.time}`} className="flex items-center justify-between py-2.5">
                 <div>
                   <p className="text-sm font-medium">{st.name}</p>
                   <p className="font-mono text-xs text-muted-foreground">{st.rollNo}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground">0{8 + (i % 2)}:{i}5 AM</span>
-                  <StatusBadge status={i === 3 ? "late" : "on-time"} />
+                  <span className="font-mono text-xs text-muted-foreground">{st.time}</span>
+                  <StatusBadge status={st.status} />
                 </div>
               </li>
             ))}

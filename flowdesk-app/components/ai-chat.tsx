@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Bot, Send, X } from "lucide-react"
-import { CHAT_FAQ, CHAT_FALLBACK, CHAT_SUGGESTIONS } from "@/lib/data/chat"
+import { CHAT_FAQ, CHAT_FALLBACK, CHAT_SUGGESTIONS } from "@/lib/chat-content"
 import { cn } from "@/lib/utils"
 
 type Message = { id: string; from: "bot" | "user"; text: string }

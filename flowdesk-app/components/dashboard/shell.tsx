@@ -23,7 +23,7 @@ import {
   MessageSquareText,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { NOTIFICATIONS, ROLE_META, type Role } from "@/lib/mock-data"
+import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Avatar, RoleBadge } from "@/components/dashboard/primitives"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
@@ -83,15 +83,51 @@ const NAV: NavItem[] = [
   { id: "feedback", label: "Feedback", icon: MessageSquareText, roles: ["student", "staff", "admin"] },
 ]
 
+const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {
+  student: {
+    label: "Student",
+    blurb: "Check in, track modules, and stay connected with your mentor.",
+    accent: "chart-1",
+  },
+  staff: {
+    label: "Staff",
+    blurb: "Manage attendance, classes and mentee guidance.",
+    accent: "chart-2",
+  },
+  admin: {
+    label: "Administrator",
+    blurb: "Oversee the whole campus, people and biometric access.",
+    accent: "chart-3",
+  },
+}
+
 export function DashboardShell() {
   const router = useRouter()
   const { user, ready, logout } = useAuth()
   const [active, setActive] = useState<SectionId>("overview")
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
 
   useEffect(() => {
     if (ready && !user) router.replace("/")
   }, [ready, user, router])
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return
+        const notifications = (j?.notifications ?? []) as NotificationItem[]
+        setUnread(notifications.filter((n) => n.unread).length)
+      })
+      .catch(() => {
+        // badge stays hidden if notifications can't be loaded
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const navItems = useMemo(() => (user ? NAV.filter((n) => n.roles.includes(user.role)) : []), [user])
 
@@ -106,7 +142,6 @@ export function DashboardShell() {
   }
 
   const mentorLabel = user.role === "staff" ? "Mentees" : "My Mentor"
-  const unread = NOTIFICATIONS.filter((n) => n.unread).length
 
   const handleLogout = async () => {
     await logout()

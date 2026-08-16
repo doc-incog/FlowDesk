@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
-import type { Role } from "@/lib/mock-data"
+import type { Role } from "@/lib/seed-data/core"
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cn("glass rounded-xl p-5", className)}>{children}</div>

@@ -1,13 +1,40 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Mail, Phone, MapPin, Clock, CalendarPlus, Users } from "lucide-react"
-import { MENTORS, STUDENTS, type Role } from "@/lib/mock-data"
+import type { Mentor, Role, UserProfile } from "@/lib/seed-data/core"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 
 export function MentorSection({ role, mentorId }: { role: Role; mentorId?: string }) {
+  const [mentor, setMentor] = useState<Mentor | null>(null)
+  const [mentees, setMentees] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch("/api/mentor")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return
+        if (d?.error) setError(d.error)
+        else {
+          setMentor(d.mentor ?? null)
+          setMentees(d.mentees ?? [])
+        }
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [role, mentorId])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+
   // Staff members see their mentees; students see their assigned mentor.
   if (role === "staff") {
-    const mentees = STUDENTS.filter((s) => s.mentorId === "MEN-01")
     return (
       <div className="space-y-6">
         <SectionHeading title="My mentees" description={`${mentees.length} students under your mentorship`} />
@@ -28,12 +55,22 @@ export function MentorSection({ role, mentorId }: { role: Role; mentorId?: strin
               </a>
             </Card>
           ))}
+          {mentees.length === 0 && (
+            <Card className="py-10 text-center text-sm text-muted-foreground">No students under your mentorship.</Card>
+          )}
         </div>
       </div>
     )
   }
 
-  const mentor = MENTORS.find((m) => m.id === mentorId) ?? MENTORS[0]
+  if (!mentor) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading title="My mentor" description="Your assigned faculty mentor and how to reach them." />
+        <Card className="py-10 text-center text-sm text-muted-foreground">No mentor assigned yet.</Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

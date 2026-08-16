@@ -1,21 +1,40 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Mail, Search } from "lucide-react"
-import { MENTORS, STAFF, STUDENTS, type Role, type UserProfile } from "@/lib/mock-data"
+import type { Mentor, Role, UserProfile } from "@/lib/seed-data/core"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 
-function mentorName(mentorId?: string) {
-  return MENTORS.find((m) => m.id === mentorId)?.name ?? "—"
-}
-
 export function DirectorySection({ kind, role }: { kind: "students" | "staff"; role: Role }) {
-  const data = kind === "students" ? STUDENTS : STAFF
+  const [data, setData] = useState<UserProfile[] | null>(null)
+  const [mentors, setMentors] = useState<Mentor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<UserProfile | null>(null)
 
+  useEffect(() => {
+    let alive = true
+    fetch("/api/directory")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return
+        if (d?.error) setError(d.error)
+        else {
+          setData(kind === "students" ? d.students ?? [] : d.staff ?? [])
+          setMentors(d.mentors ?? [])
+        }
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [kind])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
+    if (!data) return []
     if (!q) return data
     return data.filter(
       (p) =>
@@ -26,10 +45,15 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
   }, [data, query])
 
   const title = kind === "students" ? "Student directory" : "Staff directory"
-  const desc =
-    kind === "students"
+  const desc = data
+    ? kind === "students"
       ? `${data.length} students${role === "staff" ? " you teach or mentor" : " across the campus"}`
       : `${data.length} faculty and staff members`
+    : ""
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   return (
     <div className="space-y-6">
@@ -89,7 +113,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                 {kind === "students" && <Row label="Roll No" value={selected.rollNo ?? "—"} mono />}
                 <Row label="Department" value={selected.department} />
                 {kind === "students" ? (
-                  <Row label="Mentor" value={mentorName(selected.mentorId)} />
+                  <Row label="Mentor" value={mentors.find((m) => m.id === selected.mentorId)?.name ?? "—"} />
                 ) : (
                   <Row label="Subjects" value={selected.subjects?.join(", ") ?? "—"} />
                 )}

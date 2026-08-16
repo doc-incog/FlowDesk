@@ -1,24 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CalendarDays, Check, Clock, Download, MapPin, Plus, Trash2, TrendingUp } from "lucide-react"
-import {
-  EXAMINATIONS,
-  RESULTS,
-  gradeFor,
-  percentage,
-  seatFor,
-  type Exam,
-  type ExamType,
-  type ResultRow,
-} from "@/lib/data/exams"
-import { SCHEDULE, STUDENTS, type Role, type UserProfile } from "@/lib/mock-data"
-import { DEMO_USERS } from "@/lib/mock-data"
+import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { downloadHtml } from "@/lib/download"
-import { useLocalStorage } from "@/lib/storage"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+
+type ExamType = "midterm" | "final" | "practical"
+
+type Exam = {
+  id: string
+  title: string
+  moduleCode: string
+  moduleName: string
+  type: ExamType
+  date: string
+  start: string
+  end: string
+  room: string
+  maxMarks: number
+  result?: { marks: number; maxMarks: number }
+}
+
+type ResultRow = {
+  id: string
+  examId: string
+  studentId: string
+  marks: number
+  maxMarks: number
+}
 
 const TYPE_BADGE: Record<ExamType, string> = {
   midterm: "pill bg-chart-1/10 text-chart-1",
@@ -30,6 +42,25 @@ const TYPE_LABEL: Record<ExamType, string> = {
   midterm: "Mid-term",
   final: "Final",
   practical: "Practical",
+}
+
+function percentage(marks: number, max: number): number {
+  return max > 0 ? Math.round((marks / max) * 100) : 0
+}
+
+function gradeFor(pct: number): string {
+  if (pct >= 90) return "A+"
+  if (pct >= 80) return "A"
+  if (pct >= 70) return "B+"
+  if (pct >= 60) return "B"
+  if (pct >= 50) return "C+"
+  if (pct >= 40) return "C"
+  return "D"
+}
+
+function seatFor(studentId: string, students: UserProfile[]): number {
+  const idx = students.findIndex((s) => s.id === studentId)
+  return idx >= 0 ? idx + 1 : 0
 }
 
 const tabsFor = (role: Role): TabItem[] => {
@@ -56,9 +87,61 @@ const tabsFor = (role: Role): TabItem[] => {
 }
 
 export function ExamsSection({ role }: { role: Role }) {
-  const [exams, setExams] = useLocalStorage<Exam[]>("flowdesk.exams", EXAMINATIONS)
-  const [results, setResults] = useLocalStorage<ResultRow[]>("flowdesk.results", RESULTS)
+  const [exams, setExams] = useState<Exam[] | null>(null)
+  const [results, setResults] = useState<ResultRow[]>([])
+  const [students, setStudents] = useState<UserProfile[]>([])
+  const [me, setMe] = useState<UserProfile | null>(null)
+  const [modules, setModules] = useState<[string, string][]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("schedule")
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([
+      fetch("/api/exams").then((r) => r.json()),
+      fetch("/api/directory").then((r) => r.json()),
+      fetch("/api/schedule").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([e, d, s, m]) => {
+        if (!alive) return
+        if (e?.error) {
+          setError(e.error)
+        } else {
+          const examsList = e.exams ?? []
+          setExams(examsList)
+          const myId = m?.user?.id ?? ""
+          setResults(
+            examsList.flatMap((ex: Exam) =>
+              ex.result
+                ? [{ id: `${ex.id}-${myId}`, examId: ex.id, studentId: myId, marks: ex.result.marks, maxMarks: ex.result.maxMarks }]
+                : [],
+            ),
+          )
+        }
+        if (d?.students) setStudents(d.students)
+        if (s?.schedule) {
+          setModules(
+            Array.from(new Map((s.schedule as ScheduleSlot[]).map((slot) => [slot.code, slot.module])).entries()),
+          )
+        }
+        if (m?.user) setMe(m.user)
+        else if (m?.error && !e?.error) setError(m.error)
+      })
+      .catch(() => alive && setError("Failed to load"))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!exams || !me) return <p className="text-sm text-muted-foreground">Loading…</p>
+
+  const setExamsSafe: React.Dispatch<React.SetStateAction<Exam[]>> = (updater) =>
+    setExams((prev) => (typeof updater === "function" ? updater(prev ?? []) : updater))
 
   return (
     <div className="space-y-6">
@@ -69,11 +152,11 @@ export function ExamsSection({ role }: { role: Role }) {
       <SectionTabs tabs={tabsFor(role)} active={tab} onChange={setTab} />
 
       {tab === "schedule" && <ExamSchedule exams={exams} />}
-      {tab === "seating" && <SeatingView exams={exams} />}
-      {tab === "entry" && <MarkEntry exams={exams} results={results} setResults={setResults} />}
-      {tab === "results" && role === "student" && <ReportCardView student={DEMO_USERS.student} exams={exams} results={results} />}
-      {tab === "results" && role !== "student" && <AllResults exams={exams} results={results} />}
-      {tab === "manage" && role === "admin" && <ManageExams exams={exams} setExams={setExams} />}
+      {tab === "seating" && <SeatingView exams={exams} students={students} me={me} />}
+      {tab === "entry" && <MarkEntry exams={exams} results={results} setResults={setResults} students={students} />}
+      {tab === "results" && role === "student" && <ReportCardView student={me} exams={exams} results={results} />}
+      {tab === "results" && role !== "student" && <AllResults exams={exams} results={results} students={students} />}
+      {tab === "manage" && role === "admin" && <ManageExams exams={exams} setExams={setExamsSafe} modules={modules} />}
     </div>
   )
 }
@@ -112,10 +195,10 @@ function Row({ icon, label }: { icon: React.ReactNode; label: string }) {
   )
 }
 
-function SeatingView({ exams }: { exams: Exam[] }) {
+function SeatingView({ exams, students, me }: { exams: Exam[]; students: UserProfile[]; me: UserProfile }) {
   const [examId, setExamId] = useState(exams[0]?.id ?? "")
   const exam = exams.find((e) => e.id === examId)
-  const mySeat = seatFor(DEMO_USERS.student.id)
+  const mySeat = seatFor(me.id, students)
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -152,10 +235,10 @@ function SeatingView({ exams }: { exams: Exam[] }) {
             </div>
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Room layout ({STUDENTS.length} seats)
+                Room layout ({students.length} seats)
               </p>
               <div className="grid grid-cols-5 gap-3">
-                {STUDENTS.map((s, i) => {
+                {students.map((s, i) => {
                   const seat = i + 1
                   const mine = seat === mySeat
                   return (
@@ -319,9 +402,9 @@ function ReportCardView({ student, exams, results }: { student: UserProfile; exa
   )
 }
 
-function AllResults({ exams, results }: { exams: Exam[]; results: ResultRow[] }) {
-  const [studentId, setStudentId] = useState(STUDENTS[0]?.id ?? "")
-  const student = STUDENTS.find((s) => s.id === studentId) ?? STUDENTS[0]
+function AllResults({ exams, results, students }: { exams: Exam[]; results: ResultRow[]; students: UserProfile[] }) {
+  const [studentId, setStudentId] = useState(students[0]?.id ?? "")
+  const student = students.find((s) => s.id === studentId) ?? students[0]
 
   return (
     <div className="space-y-6">
@@ -332,7 +415,7 @@ function AllResults({ exams, results }: { exams: Exam[]; results: ResultRow[] })
           onChange={(e) => setStudentId(e.target.value)}
           className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
         >
-          {STUDENTS.map((s) => (
+          {students.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name} · {s.rollNo}
             </option>
@@ -348,10 +431,12 @@ function MarkEntry({
   exams,
   results,
   setResults,
+  students,
 }: {
   exams: Exam[]
   results: ResultRow[]
   setResults: React.Dispatch<React.SetStateAction<ResultRow[]>>
+  students: UserProfile[]
 }) {
   const [examId, setExamId] = useState(exams[0]?.id ?? "")
   const [marks, setMarks] = useState<Record<string, number>>({})
@@ -370,7 +455,7 @@ function MarkEntry({
     if (!exam) return
     setResults((prev) => {
       const others = prev.filter((r) => r.examId !== examId)
-      const rows: ResultRow[] = STUDENTS.map((s) => ({
+      const rows: ResultRow[] = students.map((s) => ({
         id: `${examId}-${s.id}`,
         examId,
         studentId: s.id,
@@ -411,7 +496,7 @@ function MarkEntry({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {STUDENTS.map((s) => {
+            {students.map((s) => {
               const m = marks[s.id] ?? 0
               const pct = exam ? percentage(m, exam.maxMarks) : 0
               return (
@@ -454,11 +539,12 @@ function MarkEntry({
 function ManageExams({
   exams,
   setExams,
+  modules,
 }: {
   exams: Exam[]
   setExams: React.Dispatch<React.SetStateAction<Exam[]>>
+  modules: [string, string][]
 }) {
-  const modules = Array.from(new Map(SCHEDULE.map((s) => [s.code, s.module])).entries())
   const [form, setForm] = useState({
     moduleCode: "",
     moduleName: "",
