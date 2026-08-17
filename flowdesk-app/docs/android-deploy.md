@@ -13,7 +13,7 @@ generation, middleware) with the SWC native binary removed entirely.
 
 - An Android phone (tested target: Redmi Note 8, arm64, 4 GB RAM, Android 9+/MIUI).
 - A PC with `pnpm` and the repo cloned.
-- Phone and PC on the same Wi-Fi (for the initial transfer + LAN access).
+- Phone and PC on the same Wi-Fi for the initial transfer only.
 - The GitHub repo is public: `https://github.com/doc-incog/FlowDesk.git`.
 
 ## Part A — PC: build the transfer bundle
@@ -31,7 +31,7 @@ bundle). The bundle is ~3 MB and is regenerated on every rebuild.
 
 > Do not include `.next/cache` / `.next/dev` — `next start` does not need them.
 
-## Part B — Phone: install Termux + Node
+## Part B — Phone: install Termux + dependencies
 
 1. Install **Termux from F-Droid** (https://f-droid.org/packages/com.termux/).
    The Play Store version is abandoned and will not work.
@@ -39,17 +39,16 @@ bundle). The bundle is ~3 MB and is regenerated on every rebuild.
 
 ```bash
 pkg update -y && pkg upgrade -y
-pkg install nodejs-lts openssh net-tools
+pkg install nodejs-lts openssh net-tools cloudflared termux-api
 ```
 
 3. Verify Node and the built-in SQLite driver:
 
 ```bash
 node --version            # expect v24.x (or v22.x)
-node -e "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(':memory:'); db.exec('CREATE TABLE t(x)'); console.log('sqlite OK')"
 ```
 
-If the second command fails, see Troubleshooting.
+If `node:sqlite` is missing, see Troubleshooting.
 
 4. (For scp) set a password and start the SSH server:
 
@@ -99,17 +98,21 @@ tar -xzf ~/next-android.tar.gz -C $HOME/FlowDesk/flowdesk-app
 > No scp? `termux-setup-storage` unlocks `/sdcard` — copy the tar via USB into
 > `Download/` and use `cp /sdcard/Download/next-android.tar.gz $HOME/`.
 
-## Part D — Run the server
+## Part D — Start the server + public URL
+
+Run both the server and a Cloudflare tunnel with one command:
 
 ```bash
-pkg install termux-api      # provides termux-wake-lock (needs the Termux:API app from F-Droid)
-termux-wake-lock            # keep Node alive when the screen is off
-cd $HOME/FlowDesk/flowdesk-app
-pnpm start                  # next start on port 3000
+chmod +x $HOME/FlowDesk/flowdesk-app/scripts/start-android.sh
+$HOME/FlowDesk/flowdesk-app/scripts/start-android.sh
 ```
 
-The first start creates and seeds a fresh `.data/` database (SQLite) inside
-`flowdesk-app/`. It persists across restarts.
+This starts:
+- **Next.js** on port 3000 (LAN accessible at `http://<phone-ip>:3000`)
+- **Cloudflare tunnel** giving a stable public URL like `https://x7k2m9.trycloudflare.com`
+
+The public URL works from **any network** — it doesn't depend on the phone's
+IP address. Copy it from the terminal output and share it with anyone.
 
 Verify on the phone:
 
@@ -117,41 +120,26 @@ Verify on the phone:
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/    # expect 200
 ```
 
-Verify from the PC (same Wi-Fi):
+Verify from the public URL (from any device, any network):
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://<phone-ip>:3000/    # expect 200
+curl -s -o /dev/null -w '%{http_code}\n' https://<your-url>.trycloudflare.com/    # expect 200
 ```
 
-Then open `http://<phone-ip>:3000` in a browser and test login, the dashboard,
-and a PDF download.
+Then open the URL in a browser and test login, the dashboard, and a PDF download.
 
-## Part E — Public URL (optional, free)
+> **Without cloudflared?** If you skipped installing cloudflared, the script
+> prints the LAN IP and tells you. LAN-only access still works fine from any
+> device on the same Wi-Fi.
 
-Primary — Cloudflare tunnel (no account needed):
-
-```bash
-pkg install cloudflared
-cloudflared tunnel --url http://localhost:3000
-```
-
-Copy the printed `https://<random>.trycloudflare.com` URL — reachable from
-anywhere while the process runs.
-
-Fallback — Pinggy (zero install, but free sessions cap at 60 minutes):
-
-```bash
-ssh -p 443 -R0:localhost:3000 free.pinggy.io
-```
-
-## Part F — Keep it alive on MIUI (important)
+## Part E — Keep it alive on MIUI (important)
 
 Android/MIUI aggressively kills background processes. The phone must stay in
 charge of this:
 
 1. Settings → Apps → Termux → Battery → **Unrestricted**.
 2. Keep the phone plugged in (prevents throttling + Doze suspension).
-3. Run `termux-wake-lock` before starting the server (Part D).
+3. The start script runs `termux-wake-lock` automatically.
 4. Disable any MIUI "Battery saver" / auto-cleaner for Termux.
 
 Optional auto-start after reboot — install **Termux:Boot** from F-Droid, then:
@@ -161,17 +149,24 @@ mkdir -p ~/.termux/boot
 cat > ~/.termux/boot/start-flowdesk.sh <<'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 termux-wake-lock
-cd $HOME/FlowDesk/flowdesk-app
-pnpm start
+$HOME/FlowDesk/flowdesk-app/scripts/start-android.sh
 EOF
 chmod +x ~/.termux/boot/start-flowdesk.sh
 ```
 
-## Part G — Updating the app
+## Part F — Updating the app
 
 On the PC: rebuild + re-tar (`pnpm build && ./scripts/build-android-bundle.sh`),
-then `scp` the tar again and extract on the phone (Part C/Part D).
+then `scp` the tar again and extract on the phone (Part C).
 `git pull` inside the repo first if the code changed upstream.
+
+If the schema changed (new tables/columns), wipe the phone's database first:
+
+```bash
+rm -rf $HOME/FlowDesk/flowdesk-app/.data
+```
+
+The first start after wiping re-seeds fresh data.
 
 ## Troubleshooting
 
@@ -179,11 +174,37 @@ then `scp` the tar again and extract on the phone (Part C/Part D).
 |---|---|
 | `Failed to load SWC binary for android/arm64` | You should never see this with a PC-built bundle. If you do, you ran `next build` on the phone — switch to webpack mode (`next build --webpack`) or patch in a community Android SWC binary. |
 | `node:sqlite` throws `ERR_UNKNOWN_BUILTIN_MODULE` | Termux's Node lacks the bundled SQLite. Install build tools and swap to `better-sqlite3`: `pkg install clang make python binutils`, then `pnpm remove` nothing — update `lib/db/*` imports (documented separately). |
-| Server dies when screen locks | Wake lock missing, or MIUI battery optimisation active (Part F). |
+| Server dies when screen locks | Wake lock missing, or MIUI battery optimisation active (Part E). |
 | `http://<phone-ip>:3000` times out from PC | Phone and PC on different Wi-Fi / AP isolation enabled; test `localhost:3000` on the phone first. |
 | Login works but every page/API returns 401 | Stale bundle: the session cookie's `Secure` flag was previously unconditional in production. Re-transfer the current bundle (which makes it scheme-aware) and restart. |
-| Tunnel URL not loading | The tunnel process was killed by the OS — restart `cloudflared`/`ssh` inside an active Termux session (Part E). |
-| Out of memory | 4 GB is enough for this app; if the OS kills Node under load, reduce concurrency (`NODE_OPTIONS=--max-old-space-size=1024`) and keep the phone cool. |
+| Tunnel URL not loading | The tunnel process was killed by the OS — restart via the start script or run `cloudflared tunnel --url http://localhost:3000` manually. |
+| Public URL changes on restart | This is expected with free Cloudflare quick tunnels. For a permanent domain, use a named tunnel (see below). |
+| Dashboard nav is empty after schema change | Wipe `.data` and restart — the old database is missing the roles/permissions tables (`rm -rf .data`). |
+
+## Custom domain (optional)
+
+The free quick tunnel gives a random `*.trycloudflare.com` URL that changes on
+restart. For a **permanent domain**:
+
+1. Sign up for a free Cloudflare account.
+2. Point a domain's nameservers to Cloudflare.
+3. Install `cloudflared` and run:
+   ```bash
+   cloudflared tunnel create flowdesk
+   cloudflared tunnel route dns flowdesk flowdesk.yourdomain.com
+   ```
+4. Create `~/.cloudflared/config.yml`:
+   ```yaml
+   tunnel: <tunnel-id>
+   credentials-file: /data/data/com.termux/files/home/.cloudflared/<tunnel-id>.json
+   ingress:
+     - hostname: flowdesk.yourdomain.com
+       service: http://localhost:3000
+     - service: http_status:404
+   ```
+5. Run: `cloudflared tunnel run flowdesk`
+
+The app itself requires zero code changes — only the tunnel configuration.
 
 ## Security notes
 
@@ -193,5 +214,6 @@ then `scp` the tar again and extract on the phone (Part C/Part D).
 - Don't commit `.data/` (SQLite DB + student uploads). It is gitignored.
 - A public tunnel exposes the app to the internet; for anything beyond a demo
   add a reverse proxy + HTTPS and consider replacing the phone host.
+- Cloudflare provides HTTPS automatically — no certificate management needed.
 - This is a demo-grade host: no SLA, throttles when hot, and Android can kill
   the process at any time. Not for production traffic.
