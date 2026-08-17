@@ -55,7 +55,7 @@ export function AIChat() {
         <div
           role="dialog"
           aria-label="Flow Assistant chat"
-          className="glass-strong fixed bottom-24 right-4 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl"
+          className="glass-strong fixed inset-x-2 bottom-24 z-50 flex h-[min(65vh,28rem)] w-[min(100vw-1rem,22rem)] flex-col overflow-hidden rounded-2xl sm:inset-x-auto sm:bottom-24 sm:right-4"
         >
           <div className="flex items-center gap-2.5 border-b border-border bg-secondary/40 px-4 py-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -150,7 +150,7 @@ export function AIChat() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close assistant" : "Open assistant"}
-        className="fixed bottom-5 right-4 z-50 flex h-13 w-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+        className="fixed bottom-4 right-3 z-50 flex h-13 w-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 sm:bottom-5 sm:right-4"
       >
         {open ? <X className="h-6 w-6" aria-hidden /> : <Bot className="h-6 w-6" aria-hidden />}
       </button>

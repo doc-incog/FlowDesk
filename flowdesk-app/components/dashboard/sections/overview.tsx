@@ -133,7 +133,7 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
         <div className="space-y-6">
           <Card>
             <SectionHeading title="Quick actions" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <QuickAction icon={<Fingerprint className="h-5 w-5" />} label="Check in" onClick={() => onNavigate("checkin")} />
               <QuickAction icon={<CalendarClock className="h-5 w-5" />} label="Schedule" onClick={() => onNavigate("schedule")} />
               <QuickAction icon={<Bell className="h-5 w-5" />} label="Notices" onClick={() => onNavigate("notifications")} />

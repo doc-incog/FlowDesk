@@ -170,6 +170,12 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                 />
               ) : (
                 <>
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground lg:hidden"
+                  >
+                    ← Back to list
+                  </button>
                   <div className="flex flex-col items-center gap-3 text-center">
                     <Avatar initials={selected.avatarInitials} className="h-16 w-16 text-lg" />
                     <div>

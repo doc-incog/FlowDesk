@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/avatar.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../providers/auth_controller.dart';
@@ -110,6 +111,7 @@ class _ProfileSectionState extends ConsumerState<ProfileSection> {
     final roles = ref.watch(rolesProvider);
     final roleLabel = roles.labelFor(user.roleKeyValue) ?? user.role.label;
     final scheme = Theme.of(context).colorScheme;
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
 
     return SectionScaffold(
       title: 'Profile',
@@ -163,28 +165,53 @@ class _ProfileSectionState extends ConsumerState<ProfileSection> {
               ),
               const SizedBox(height: 12),
               _field('Address', _address),
-              if (isStudent) ...[
+              if (isWide) ...[
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _field('Roll no', _rollNo)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _field('Semester', _semester)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _field('Batch', _batch)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _field('Mentor ID', _mentorId)),
-                  ],
-                ),
+                if (isStudent) ...[
+                  Row(
+                    children: [
+                      Expanded(child: _field('Roll no', _rollNo)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('Semester', _semester)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('Batch', _batch)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _field('Mentor ID', _mentorId),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(child: _field('Designation', _designation)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('Subjects (comma separated)', _subjects)),
+                    ],
+                  ),
+                ],
               ] else ...[
-                const SizedBox(height: 12),
-                _field('Designation', _designation),
-                const SizedBox(height: 12),
-                _field('Subjects (comma separated)', _subjects),
+                if (isStudent) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _field('Roll no', _rollNo)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('Semester', _semester)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _field('Batch', _batch)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field('Mentor ID', _mentorId)),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _field('Designation', _designation),
+                  const SizedBox(height: 12),
+                  _field('Subjects (comma separated)', _subjects),
+                ],
               ],
               const SizedBox(height: 20),
               FilledButton.icon(

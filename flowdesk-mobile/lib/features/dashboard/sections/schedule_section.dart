@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/tabs.dart';
 import '../../../core/utils/logic.dart';
@@ -94,6 +95,7 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
         };
 
     final daySlots = slots.where((s) => s.day == _day).toList();
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
 
     return SectionScaffold(
       title: 'Schedule',
@@ -106,90 +108,94 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
           labels: tabLabel,
         ),
         if (_tab == _ScheduleTab.weekly) ...[
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final d in mock.scheduleDays)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () => setState(() => _day = d),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _day == d
-                              ? colors.chart1
-                              : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          d,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: _day == d ? Colors.white : scheme.onSurface,
+          if (isWide)
+            _WeeklyGrid(slots: slots, colors: colors, scheme: scheme)
+          else ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final d in mock.scheduleDays)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: InkWell(
+                        onTap: () => setState(() => _day = d),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _day == d
+                                ? colors.chart1
+                                : scheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            d,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: _day == d ? Colors.white : scheme.onSurface,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (daySlots.isEmpty)
-            const GlassCard(child: EmptyState(message: 'No classes scheduled for this day.'))
-          else
-            for (final s in daySlots)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GlassCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: colors.chart1,
-                          borderRadius: BorderRadius.circular(4),
+            if (daySlots.isEmpty)
+              const GlassCard(child: EmptyState(message: 'No classes scheduled for this day.'))
+            else
+              for (final s in daySlots)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GlassCard(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: colors.chart1,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s.module,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 15)),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${s.start} – ${s.end}',
-                              style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 13,
-                                  color: colors.chart1,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 2),
-                            Text('${s.room} · ${s.staff}',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: scheme.onSurfaceVariant)),
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.module,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 15)),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${s.start} – ${s.end}',
+                                style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 13,
+                                    color: colors.chart1,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text('${s.room} · ${s.staff}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: scheme.onSurfaceVariant)),
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(s.code,
-                          style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              color: scheme.onSurfaceVariant)),
-                    ],
+                        Text(s.code,
+                            style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+          ],
         ],
         if (_tab == _ScheduleTab.conflicts) ...[
           GlassCard(
@@ -346,6 +352,78 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
   }
 
   bool _overlaps(ScheduleSlot a, ScheduleSlot b) => detectConflicts([a], b).isNotEmpty;
+}
+
+/// Weekly grid view for tablet/wide layouts.
+class _WeeklyGrid extends StatelessWidget {
+  const _WeeklyGrid({required this.slots, required this.colors, required this.scheme});
+
+  final List<ScheduleSlot> slots;
+  final AppColors colors;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          for (final day in mock.scheduleDays) ...[
+            if (day != mock.scheduleDays.first)
+              Divider(height: 1, color: scheme.outlineVariant),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 48,
+                    child: Text(day,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Builder(
+                      builder: (_) {
+                        final daySlots = slots.where((s) => s.day == day).toList();
+                        if (daySlots.isEmpty) {
+                          return Text('No classes',
+                              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant));
+                        }
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final s in daySlots)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: colors.chart1.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(s.module,
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                    Text('${s.start}–${s.end} · ${s.room}',
+                                        style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _TimeField extends StatelessWidget {

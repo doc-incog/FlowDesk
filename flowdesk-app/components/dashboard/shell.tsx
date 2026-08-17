@@ -267,7 +267,7 @@ export function DashboardShell() {
   return (
     <div className="ambient flex min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 px-3 py-3 lg:block">
+      <aside className="sticky top-0 hidden h-screen w-[min(80vw,16rem)] shrink-0 px-3 py-3 lg:block">
         <div className="glass-strong h-full overflow-hidden rounded-2xl bg-sidebar/70">{SidebarContent}</div>
       </aside>
 
@@ -279,7 +279,7 @@ export function DashboardShell() {
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <aside className="absolute left-0 top-0 h-full w-64 border-r border-sidebar-border bg-sidebar">
+          <aside className="absolute left-0 top-0 h-full w-[min(80vw,16rem)] border-r border-sidebar-border bg-sidebar">
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute right-3 top-4 text-sidebar-foreground/70"
@@ -338,7 +338,7 @@ export function DashboardShell() {
             </button>
           </div>
         </header>
-        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 lg:px-6 lg:py-8">
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 lg:px-8 lg:py-8 xl:px-10">
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>

@@ -298,7 +298,7 @@ function AddSlotView({
       <Card>
         <SectionHeading title="Add a class slot" description="Conflicts are detected automatically before the slot is saved." />
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <label htmlFor="schedule-day" className="text-sm font-medium">Day</label>
               <select id="schedule-day" value={form.day} onChange={(e) => setForm((f) => ({ ...f, day: e.target.value }))} className={inputCls}>
@@ -327,7 +327,7 @@ function AddSlotView({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label htmlFor="schedule-room" className="text-sm font-medium">Room</label>
               <input id="schedule-room" value={form.room} onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))} placeholder="B-204" className={inputCls} />

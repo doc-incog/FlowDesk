@@ -108,7 +108,7 @@ function RolesTab({ roles, reload }: { roles: RoleInfo[] | null; reload: () => v
               }}
             />
           ) : (
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <ShieldCheck className="h-5 w-5" aria-hidden />
               </div>
@@ -130,7 +130,7 @@ function RolesTab({ roles, reload }: { roles: RoleInfo[] | null; reload: () => v
                   )}
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <button
                   onClick={() => setEditing(r.key)}
                   className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/avatar.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/modal.dart';
@@ -27,6 +28,7 @@ class DirectorySection extends ConsumerStatefulWidget {
 
 class _DirectorySectionState extends ConsumerState<DirectorySection> {
   String _query = '';
+  UserProfile? _selectedPerson;
 
   String _mentorName(String? mentorId) {
     if (mentorId == null) return '—';
@@ -64,76 +66,85 @@ class _DirectorySectionState extends ConsumerState<DirectorySection> {
   }
 
   void _showDetail(UserProfile person) {
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
+    if (isWide) {
+      setState(() => _selectedPerson = person);
+      return;
+    }
     showAppModal(
       context: context,
       title: person.name,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Avatar(initials: person.avatarInitials, size: 56),
-              const SizedBox(width: 14),
+      child: _personDetail(person),
+    );
+  }
+
+  Widget _personDetail(UserProfile person) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Avatar(initials: person.avatarInitials, size: 56),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(person.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 16)),
+                  Text('${person.role.label} · ${person.id}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const Divider(height: 28),
+        _infoRow(context, 'Department', person.department),
+        if (person.rollNo != null) _infoRow(context, 'Roll no', person.rollNo!),
+        if (person.semester != null) _infoRow(context, 'Semester', person.semester!),
+        if (person.batch != null) _infoRow(context, 'Batch', person.batch!),
+        if (person.mentorId != null)
+          _infoRow(context, 'Mentor', _mentorName(person.mentorId)),
+        if (person.designation != null)
+          _infoRow(context, 'Designation', person.designation!),
+        if (person.subjects != null)
+          _infoRow(context, 'Subjects', person.subjects!.join(', ')),
+        if (person.phone != null) _infoRow(context, 'Phone', person.phone!),
+        if (person.dob != null) _infoRow(context, 'Date of birth', person.dob!),
+        if (person.address != null) _infoRow(context, 'Address', person.address!),
+        const SizedBox(height: 8),
+        _infoRow(context, 'Email', person.email),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _mail(person.email),
+                icon: const Icon(Icons.mail_outline_rounded, size: 18),
+                label: const Text('Contact'),
+              ),
+            ),
+            if (_admin) ...[
+              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(person.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 16)),
-                    Text('${person.role.label} · ${person.id}',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontFamily: 'monospace',
-                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                  ],
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _openPersonForm(existing: person);
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
                 ),
               ),
             ],
-          ),
-          const Divider(height: 28),
-          _infoRow(context, 'Department', person.department),
-          if (person.rollNo != null) _infoRow(context, 'Roll no', person.rollNo!),
-          if (person.semester != null) _infoRow(context, 'Semester', person.semester!),
-          if (person.batch != null) _infoRow(context, 'Batch', person.batch!),
-          if (person.mentorId != null)
-            _infoRow(context, 'Mentor', _mentorName(person.mentorId)),
-          if (person.designation != null)
-            _infoRow(context, 'Designation', person.designation!),
-          if (person.subjects != null)
-            _infoRow(context, 'Subjects', person.subjects!.join(', ')),
-          if (person.phone != null) _infoRow(context, 'Phone', person.phone!),
-          if (person.dob != null) _infoRow(context, 'Date of birth', person.dob!),
-          if (person.address != null) _infoRow(context, 'Address', person.address!),
-          const SizedBox(height: 8),
-          _infoRow(context, 'Email', person.email),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _mail(person.email),
-                  icon: const Icon(Icons.mail_outline_rounded, size: 18),
-                  label: const Text('Contact'),
-                ),
-              ),
-              if (_admin) ...[
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _openPersonForm(existing: person);
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Edit'),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -156,19 +167,76 @@ class _DirectorySectionState extends ConsumerState<DirectorySection> {
           (p.rollNo?.toLowerCase().contains(q) ?? false);
     }).toList();
 
-    return SectionScaffold(
-      title: isStaff ? 'Staff directory' : 'Students',
-      description: isStaff
-          ? 'Faculty and administration across departments.'
-          : 'Browse the student body. Tap a card for details.',
-      action: _admin
-          ? FilledButton.icon(
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
+
+    if (isWide && _selectedPerson != null) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: _personList(people, isStaff),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 6,
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('Details',
+                          style: TextStyle(fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSurface)),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => setState(() => _selectedPerson = null),
+                        icon: const Icon(Icons.close, size: 20),
+                        tooltip: 'Close details',
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  _personDetail(_selectedPerson!),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return _personList(people, isStaff);
+  }
+
+  Widget _personList(List<UserProfile> people, bool isStaff) {
+    return Column(
+      children: [
+        if (_admin)
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
               onPressed: () => _openPersonForm(),
               icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
               label: const Text('Add'),
-            )
-          : null,
-      children: [
+            ),
+          ),
+        if (_selectedPerson != null && Breakpoints.isPhone(context))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedPerson = null),
+                child: Text('← Back to list',
+                    style: TextStyle(
+                        fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+              ),
+            ),
+          ),
         TextField(
           onChanged: (v) => setState(() => _query = v),
           decoration: const InputDecoration(

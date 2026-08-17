@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 
-/// Shows a modal bottom sheet styled like the web app's Modal.
+/// Shows a responsive modal — bottom sheet on phones, centered dialog on tablets+.
 Future<T?> showAppModal<T>({
   required BuildContext context,
   required String title,
@@ -10,6 +11,50 @@ Future<T?> showAppModal<T>({
   bool showClose = true,
 }) {
   final scheme = Theme.of(context).colorScheme;
+  final isWide = Breakpoints.isWide(context);
+
+  if (isWide) {
+    return showDialog<T>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(title,
+                          style: Theme.of(ctx).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                    ),
+                    if (showClose)
+                      IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: const Icon(Icons.close, size: 20),
+                        color: scheme.onSurfaceVariant,
+                        tooltip: 'Close',
+                      ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: child,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,

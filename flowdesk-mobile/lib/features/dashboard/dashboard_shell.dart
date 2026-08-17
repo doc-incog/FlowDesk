@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/widgets/avatar.dart';
 import '../../core/widgets/glass.dart';
 import '../../core/widgets/theme_toggle.dart';
@@ -59,6 +60,64 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final roleLabel = rolesData.labelFor(user.roleKeyValue) ?? user.role.label;
     final canSeeNotifications = sections.contains(SectionId.notifications.key);
 
+    final isWide = Breakpoints.isWide(context);
+    final isTablet = Breakpoints.isTablet(context);
+    final showRail = isTablet || isWide;
+
+    final sectionWidget = _buildSection(user, active);
+
+    void onSelect(SectionId s) {
+      setState(() => _active = s);
+      _scaffoldKey.currentState?.closeDrawer();
+    }
+
+    void onLogout() {
+      ref.read(authProvider.notifier).logout();
+      context.go('/');
+    }
+
+    if (showRail) {
+      return Scaffold(
+        body: Row(
+          children: [
+            _NavigationRail(
+              navItems: navItems,
+              active: active,
+              unread: unread,
+              onSelect: onSelect,
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  _TabletAppBar(
+                    roleLabel: roleLabel,
+                    user: user,
+                    unread: unread,
+                    canSeeNotifications: canSeeNotifications,
+                    onNotifications: () => setState(() => _active = SectionId.notifications),
+                    onProfile: () => setState(() => _active = SectionId.profile),
+                    onLogout: onLogout,
+                  ),
+                  Expanded(
+                    child: AmbientBackground(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(isWide ? 32 : 20, 16, isWide ? 32 : 20, 96),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: isWide ? 1100 : 800),
+                          child: sectionWidget,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Positioned(right: 16, bottom: 16, child: AIChat()),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: _DrawerContent(
@@ -66,14 +125,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         navItems: navItems,
         active: active,
         unread: unread,
-        onSelect: (s) {
-          setState(() => _active = s);
-          _scaffoldKey.currentState?.closeDrawer();
-        },
-        onLogout: () {
-          ref.read(authProvider.notifier).logout();
-          context.go('/');
-        },
+        onSelect: onSelect,
+        onLogout: onLogout,
       ),
       appBar: AppBar(
         titleSpacing: 0,
@@ -122,7 +175,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 980),
-                child: _buildSection(user, active),
+                child: sectionWidget,
               ),
             ),
             const Positioned(right: 16, bottom: 16, child: AIChat()),
@@ -168,6 +221,185 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       case SectionId.accessControl:
         return const RolesSection();
     }
+  }
+}
+
+/// NavigationRail for tablet / wide layouts.
+class _NavigationRail extends StatelessWidget {
+  const _NavigationRail({
+    required this.navItems,
+    required this.active,
+    required this.unread,
+    required this.onSelect,
+  });
+
+  final List<SectionId> navItems;
+  final SectionId active;
+  final int unread;
+  final ValueChanged<SectionId> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).extension<AppColors>()!;
+
+    return Container(
+      width: 72,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(right: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: colors.chart1,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                for (final item in navItems)
+                  _RailItem(
+                    item: item,
+                    isActive: item == active,
+                    badge: item == SectionId.notifications && unread > 0 ? unread : null,
+                    onTap: () => onSelect(item),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RailItem extends StatelessWidget {
+  const _RailItem({
+    required this.item,
+    required this.isActive,
+    this.badge,
+    required this.onTap,
+  });
+
+  final SectionId item;
+  final bool isActive;
+  final int? badge;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<AppColors>()!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? colors.chart1.withValues(alpha: 0.10) : null,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: badge != null,
+                label: badge != null ? Text('$badge') : null,
+                child: Icon(item.icon,
+                    size: 22,
+                    color: isActive ? colors.chart1 : Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  color: isActive ? colors.chart1 : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// AppBar for tablet / wide layouts.
+class _TabletAppBar extends StatelessWidget {
+  const _TabletAppBar({
+    required this.roleLabel,
+    required this.user,
+    required this.unread,
+    required this.canSeeNotifications,
+    required this.onNotifications,
+    required this.onProfile,
+    required this.onLogout,
+  });
+
+  final String roleLabel;
+  final dynamic user;
+  final int unread;
+  final bool canSeeNotifications;
+  final VoidCallback onNotifications;
+  final VoidCallback onProfile;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Row(
+        children: [
+          Text(roleLabel,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 6),
+          Text('workspace',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          const Spacer(),
+          IconButton(
+            onPressed: canSeeNotifications ? onNotifications : null,
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text('$unread'),
+              child: const Icon(Icons.notifications_outlined, size: 22),
+            ),
+            tooltip: 'Notifications',
+          ),
+          const ThemeToggle(),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onProfile,
+            child: Avatar(initials: user.avatarInitials, size: 32),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: onLogout,
+            icon: Icon(Icons.logout_rounded, size: 20, color: scheme.error),
+            tooltip: 'Sign out',
+          ),
+        ],
+      ),
+    );
   }
 }
 

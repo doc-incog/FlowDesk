@@ -27,7 +27,7 @@ export function SectionTabs({
       ref={ref}
       role="tablist"
       aria-label="Views"
-      className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border"
+      className="flex gap-x-5 gap-y-1 overflow-x-auto border-b border-border sm:flex-wrap"
     >
       {tabs.map((t, i) => (
         <button

@@ -65,7 +65,7 @@ export function ProfileSection() {
       <SectionHeading title="Profile" description="Your personal details, contact info and role-specific fields." />
 
       <Card>
-        <div className="mb-5 flex items-center gap-4">
+        <div className="mb-5 flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
           <Avatar initials={form.avatarInitials || user.avatarInitials} className="h-14 w-14 text-lg" />
           <div>
             <p className="font-bold">{form.name || user.name}</p>

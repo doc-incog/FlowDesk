@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 
 /// Frosted glass surface mirroring the web app's .glass-strong style.
 class GlassCard extends StatelessWidget {
@@ -27,6 +28,8 @@ class GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = color ?? scheme.surface.withValues(alpha: 0.72);
+    final isPhone = Breakpoints.isPhone(context);
+    final blur = isPhone ? 12.0 : 18.0;
 
     Widget content = Container(
       padding: padding ?? const EdgeInsets.all(16),
@@ -37,7 +40,7 @@ class GlassCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 18,
+            blurRadius: blur,
             offset: const Offset(0, 6),
           ),
         ],
@@ -48,7 +51,7 @@ class GlassCard extends StatelessWidget {
     content = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: content,
       ),
     );

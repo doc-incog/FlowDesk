@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import type { Role } from "@/lib/seed-data/core"
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("glass rounded-xl p-5", className)}>{children}</div>
+  return <div className={cn("glass rounded-xl p-4 sm:p-5", className)}>{children}</div>
 }
 
 export function SectionHeading({
@@ -18,7 +18,7 @@ export function SectionHeading({
   return (
     <div className="mb-5 flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-balance">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-balance sm:text-xl">{title}</h2>
         {description && <p className="mt-1 text-sm text-muted-foreground text-pretty">{description}</p>}
       </div>
       {action}
@@ -46,13 +46,13 @@ export function StatCard({
     "chart-5": "bg-muted-foreground",
   }
   return (
-    <div className="glass rounded-xl px-5 py-4">
+    <div className="glass rounded-xl px-4 py-3 sm:px-5 sm:py-4">
       <div className="flex items-center gap-1.5">
         <span className={cn("h-1.5 w-1.5 rounded-full", dotMap[tone])} aria-hidden />
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {icon && <span className="ml-auto flex h-6 w-6 items-center justify-center text-muted-foreground [&_svg]:h-4 [&_svg]:w-4">{icon}</span>}
       </div>
-      <p className="mt-2 text-2xl font-semibold leading-none tracking-tight">{value}</p>
+      <p className="mt-2 text-xl font-semibold leading-none tracking-tight sm:text-2xl">{value}</p>
       {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
