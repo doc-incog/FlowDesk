@@ -166,7 +166,7 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
         </div>
       </div>
 
-      {role !== "student" && (
+      {role === "staff" && (
         <Card>
           <SectionHeading
             title="Recent student check-ins"

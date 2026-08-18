@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   LifeBuoy,
   MessageSquareText,
+  MessageSquare,
   ShieldCheck,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
@@ -45,6 +46,7 @@ import { HelpdeskSection } from "@/components/dashboard/sections/helpdesk"
 import { FeedbackSection } from "@/components/dashboard/sections/feedback"
 import { ProfileSection } from "@/components/dashboard/sections/profile"
 import { RolesSection } from "@/components/dashboard/sections/roles"
+import { ChatSection } from "@/components/dashboard/sections/chat"
 
 export type SectionId =
   | "overview"
@@ -53,6 +55,7 @@ export type SectionId =
   | "students"
   | "staff"
   | "mentor"
+  | "chat"
   | "schedule"
   | "exams"
   | "assignments"
@@ -78,6 +81,7 @@ const NAV: NavItem[] = [
   { id: "students", label: "Students", icon: GraduationCap, roles: ["staff", "admin"] },
   { id: "staff", label: "Staff", icon: Users, roles: ["admin"] },
   { id: "mentor", label: "Mentor", icon: UserRound, roles: ["student", "staff"] },
+  { id: "chat", label: "Messages", icon: MessageSquare, roles: ["student", "staff", "admin"] },
   { id: "schedule", label: "Schedule", icon: CalendarDays, roles: ["student", "staff", "admin"] },
   { id: "exams", label: "Exams & Results", icon: ClipboardList, roles: ["student", "staff", "admin"] },
   { id: "assignments", label: "Assignments", icon: FileText, roles: ["student", "staff", "admin"] },
@@ -170,13 +174,15 @@ export function DashboardShell() {
       case "checkin":
         return <CheckInSection role={user.role} userName={user.name} />
       case "notifications":
-        return <NotificationsSection />
+        return <NotificationsSection role={user.role} />
       case "students":
         return <DirectorySection kind="students" role={user.role} />
       case "staff":
         return <DirectorySection kind="staff" role={user.role} />
       case "mentor":
         return <MentorSection role={user.role} mentorId={user.mentorId} />
+      case "chat":
+        return <ChatSection role={user.role} />
       case "schedule":
         return <ScheduleSection role={user.role} />
       case "exams":

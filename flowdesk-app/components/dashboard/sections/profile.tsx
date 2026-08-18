@@ -1,9 +1,34 @@
 "use client"
 
 import { useState } from "react"
-import { Save } from "lucide-react"
+import { Save, Lock } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
+
+function profileCompleteness(user: Record<string, unknown>): { pct: number; missing: string[] } {
+  const fields: [string, string][] = [
+    ["name", "Name"],
+    ["email", "Email"],
+    ["phone", "Phone"],
+    ["address", "Address"],
+    ["dob", "Date of birth"],
+    ["department", "Department"],
+  ]
+  if (user.role === "student") {
+    fields.push(["rollNo", "Roll no"], ["semester", "Semester"], ["batch", "Batch"])
+  } else {
+    fields.push(["designation", "Designation"])
+  }
+  const filled = fields.filter(([k]) => {
+    const v = user[k]
+    return v !== null && v !== undefined && String(v).trim() !== ""
+  })
+  const missing = fields.filter(([k]) => {
+    const v = user[k]
+    return v === null || v === undefined || String(v).trim() === ""
+  }).map(([, label]) => label)
+  return { pct: Math.round((filled.length / fields.length) * 100), missing }
+}
 
 export function ProfileSection() {
   const { user, refreshUser } = useAuth()
@@ -25,6 +50,11 @@ export function ProfileSection() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pwCurrent, setPwCurrent] = useState("")
+  const [pwNew, setPwNew] = useState("")
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState<string | null>(null)
+  const [pwError, setPwError] = useState<string | null>(null)
 
   if (!user) return <p className="text-sm text-muted-foreground">Loading…</p>
 
@@ -32,6 +62,8 @@ export function ProfileSection() {
   const set = (k: string) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
   const inputCls =
     "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+
+  const { pct, missing } = profileCompleteness({ ...form, role: user.role })
 
   const save = async () => {
     setSaving(true)
@@ -60,9 +92,53 @@ export function ProfileSection() {
     }
   }
 
+  const changePassword = async () => {
+    setPwSaving(true)
+    setPwMsg(null)
+    setPwError(null)
+    try {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setPwError(data?.error ?? "Failed to change password")
+      } else {
+        setPwMsg("Password changed successfully.")
+        setPwCurrent("")
+        setPwNew("")
+      }
+    } catch {
+      setPwError("Network error while changing password.")
+    } finally {
+      setPwSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeading title="Profile" description="Your personal details, contact info and role-specific fields." />
+
+      {/* Profile completeness */}
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-semibold">Profile completeness</p>
+          <span className="text-sm font-bold text-primary">{pct}%</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {missing.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Missing: {missing.join(", ")}
+          </p>
+        )}
+      </Card>
 
       <Card>
         <div className="mb-5 flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
@@ -136,6 +212,43 @@ export function ProfileSection() {
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
         >
           <Save className="h-4 w-4" aria-hidden /> {saving ? "Saving…" : "Save changes"}
+        </button>
+      </Card>
+
+      {/* Password change */}
+      <Card>
+        <div className="mb-4 flex items-center gap-2">
+          <Lock className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <p className="text-sm font-semibold">Change password</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Current password">
+            <input
+              type="password"
+              className={inputCls}
+              value={pwCurrent}
+              onChange={(e) => setPwCurrent(e.target.value)}
+              placeholder="Enter current password"
+            />
+          </Field>
+          <Field label="New password">
+            <input
+              type="password"
+              className={inputCls}
+              value={pwNew}
+              onChange={(e) => setPwNew(e.target.value)}
+              placeholder="At least 6 characters"
+            />
+          </Field>
+        </div>
+        {pwError && <p role="alert" className="mt-3 text-sm text-destructive">{pwError}</p>}
+        {pwMsg && <p className="mt-3 text-sm text-success">{pwMsg}</p>}
+        <button
+          onClick={changePassword}
+          disabled={pwSaving || !pwCurrent || !pwNew}
+          className="mt-4 flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-secondary disabled:opacity-50"
+        >
+          <Lock className="h-4 w-4" aria-hidden /> {pwSaving ? "Changing…" : "Change password"}
         </button>
       </Card>
     </div>

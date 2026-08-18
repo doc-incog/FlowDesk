@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
-const METHODS = new Set(["upi", "card", "netbanking", "cash"])
+const METHODS = new Set(["ewallet", "card", "netbanking", "cash"])
 
 export async function POST(
   request: Request,
@@ -22,7 +22,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 
-  const method = body.method ?? "upi"
+  const method = body.method ?? "ewallet"
   if (!METHODS.has(method)) {
     return NextResponse.json({ error: "Unsupported payment method" }, { status: 400 })
   }

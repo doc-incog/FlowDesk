@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BookOpen, CalendarHeart, TriangleAlert, Cog, Check } from "lucide-react"
-import type { NotificationItem } from "@/lib/seed-data/core"
+import { BookOpen, CalendarHeart, TriangleAlert, Cog, Check, Send } from "lucide-react"
+import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
@@ -18,11 +18,21 @@ const CATEGORY_META: Record<
 
 const FILTERS = ["all", "academic", "event", "alert", "system"] as const
 
-export function NotificationsSection() {
+export function NotificationsSection({ role }: { role: Role }) {
   const [items, setItems] = useState<NotificationItem[] | null>(null)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Compose state (admin only)
+  const [composing, setComposing] = useState(false)
+  const [composeTitle, setComposeTitle] = useState("")
+  const [composeBody, setComposeBody] = useState("")
+  const [composeCategory, setComposeCategory] = useState<NotificationItem["category"]>("system")
+  const [composeTarget, setComposeTarget] = useState<"all" | "staff" | "students">("all")
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [sendSuccess, setSendSuccess] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -54,20 +64,136 @@ export function NotificationsSection() {
   const toggle = (id: string) =>
     setItems((prev) => (prev ?? []).map((n) => (n.id === id ? { ...n, unread: false } : n)))
 
+  const sendNotification = async () => {
+    if (!composeTitle.trim()) return
+    setSending(true)
+    setSendError(null)
+    setSendSuccess(false)
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: composeTitle.trim(),
+          body: composeBody.trim(),
+          category: composeCategory,
+          target: composeTarget,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data?.error) {
+        setSendError(data?.error ?? "Failed to send")
+      } else {
+        setSendSuccess(true)
+        setComposeTitle("")
+        setComposeBody("")
+        setTimeout(() => {
+          setComposing(false)
+          setSendSuccess(false)
+        }, 1500)
+      }
+    } catch {
+      setSendError("Failed to send notification")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const inputCls =
+    "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+
   return (
     <div className="space-y-6">
       <SectionHeading
         title="Notifications"
         description={unread > 0 ? `${unread} unread notice${unread > 1 ? "s" : ""}` : "You're all caught up"}
         action={
-          <button
-            onClick={markAllRead}
-            className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"
-          >
-            <Check className="h-4 w-4" aria-hidden /> Mark all read
-          </button>
+          <div className="flex items-center gap-2">
+            {role === "admin" && (
+              <button
+                onClick={() => setComposing(!composing)}
+                className="flex items-center gap-1.5 rounded-sm bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                <Send className="h-4 w-4" aria-hidden /> Send notification
+              </button>
+            )}
+            <button
+              onClick={markAllRead}
+              className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"
+            >
+              <Check className="h-4 w-4" aria-hidden /> Mark all read
+            </button>
+          </div>
         }
       />
+
+      {/* Admin compose form */}
+      {role === "admin" && composing && (
+        <Card className="space-y-4">
+          <SectionHeading title="Compose notification" description="Send a notification to students, staff, or everyone." />
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="notif-title" className="text-sm font-medium">Title</label>
+              <input
+                id="notif-title"
+                value={composeTitle}
+                onChange={(e) => setComposeTitle(e.target.value)}
+                placeholder="e.g. Campus holiday announcement"
+                className={inputCls}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="notif-body" className="text-sm font-medium">Message</label>
+              <textarea
+                id="notif-body"
+                value={composeBody}
+                onChange={(e) => setComposeBody(e.target.value)}
+                placeholder="Notification details…"
+                rows={3}
+                className={inputCls}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="notif-category" className="text-sm font-medium">Category</label>
+                <select
+                  id="notif-category"
+                  value={composeCategory}
+                  onChange={(e) => setComposeCategory(e.target.value as NotificationItem["category"])}
+                  className={inputCls}
+                >
+                  <option value="academic">Academic</option>
+                  <option value="event">Event</option>
+                  <option value="alert">Alert</option>
+                  <option value="system">System</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="notif-target" className="text-sm font-medium">Send to</label>
+                <select
+                  id="notif-target"
+                  value={composeTarget}
+                  onChange={(e) => setComposeTarget(e.target.value as "all" | "staff" | "students")}
+                  className={inputCls}
+                >
+                  <option value="all">Everyone</option>
+                  <option value="students">Students only</option>
+                  <option value="staff">Staff only</option>
+                </select>
+              </div>
+            </div>
+            {sendError && <p role="alert" className="text-sm text-destructive">{sendError}</p>}
+            {sendSuccess && <p className="text-sm text-success font-medium">Notification sent!</p>}
+            <button
+              onClick={sendNotification}
+              disabled={!composeTitle.trim() || sending}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" aria-hidden /> {sending ? "Sending…" : "Send notification"}
+            </button>
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (

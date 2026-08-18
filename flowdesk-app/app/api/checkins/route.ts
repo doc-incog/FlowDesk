@@ -14,13 +14,37 @@ export async function GET(request: Request) {
   const date = searchParams.get("date") ?? localDate()
   const db = getDb()
 
-  const rows = db
-    .prepare(
-      `SELECT id, user_id, name, role, time, status, method, source
-       FROM check_ins WHERE substr(created_at, 1, 10) = ?
-       ORDER BY created_at DESC`,
-    )
-    .all(date) as {
+  // For staff, find mentee IDs so we can filter to only their students.
+  let menteeIds: string[] | null = null
+  if (user.role === "staff") {
+    const mentorRow = db
+      .prepare("SELECT id FROM mentors WHERE name = ?")
+      .get(user.name) as { id: string } | undefined
+    if (mentorRow) {
+      const menteeRows = db
+        .prepare("SELECT id FROM users WHERE mentor_id = ?")
+        .all(mentorRow.id) as { id: string }[]
+      menteeIds = menteeRows.map((r) => r.id)
+    }
+  }
+
+  let query = `SELECT id, user_id, name, role, time, status, method, source
+       FROM check_ins WHERE substr(created_at, 1, 10) = ?`
+  const params: (string | number)[] = [date]
+
+  if (user.role === "student") {
+    query += ` AND user_id = ?`
+    params.push(user.id)
+  } else if (user.role === "staff" && menteeIds && menteeIds.length > 0) {
+    const placeholders = menteeIds.map(() => "?").join(",")
+    query += ` AND user_id IN (${placeholders})`
+    params.push(...menteeIds)
+  }
+  // Admin sees all records (no extra filter)
+
+  query += ` ORDER BY created_at DESC`
+
+  const rows = db.prepare(query).all(...params) as {
     id: string
     user_id: string
     name: string
@@ -31,9 +55,7 @@ export async function GET(request: Request) {
     source: string
   }[]
 
-  // Students only see their own record; staff/admin see everyone.
-  const filtered =
-    user.role === "student" ? rows.filter((r) => r.user_id === user.id) : rows
+  const filtered = rows
 
   const records = filtered.map((r) => ({
     id: r.id,

@@ -95,7 +95,7 @@ class _ScheduleSectionState extends ConsumerState<ScheduleSection> {
         };
 
     final daySlots = slots.where((s) => s.day == _day).toList();
-    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
+    final isWide = !ResponsiveLayout.isCompact(context);
 
     return SectionScaffold(
       title: 'Schedule',

@@ -111,7 +111,7 @@ class _ProfileSectionState extends ConsumerState<ProfileSection> {
     final roles = ref.watch(rolesProvider);
     final roleLabel = roles.labelFor(user.roleKeyValue) ?? user.role.label;
     final scheme = Theme.of(context).colorScheme;
-    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
+    final isWide = !ResponsiveLayout.isCompact(context);
 
     return SectionScaffold(
       title: 'Profile',

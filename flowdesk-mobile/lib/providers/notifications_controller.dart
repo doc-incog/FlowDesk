@@ -14,6 +14,10 @@ class NotificationsController extends Notifier<List<NotificationItem>> {
   void markAllRead() {
     state = state.map((n) => n.copyWith(unread: false)).toList();
   }
+
+  void addNotification(NotificationItem notification) {
+    state = [notification, ...state];
+  }
 }
 
 final notificationsProvider =

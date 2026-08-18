@@ -38,10 +38,16 @@ function daysUntil(dueDate: string): number {
   return Math.round((due.getTime() - today.getTime()) / 86400000)
 }
 
-const TABS: TabItem[] = [
+const ALL_TABS: TabItem[] = [
   { id: "mytasks", label: "My tasks" },
   { id: "submissions", label: "Submissions" },
   { id: "manage", label: "Manage assignments" },
+]
+
+const STUDENT_TABS: TabItem[] = [{ id: "mytasks", label: "My tasks" }]
+const ADMIN_TABS: TabItem[] = [
+  { id: "mytasks", label: "My tasks" },
+  { id: "submissions", label: "Submissions" },
 ]
 
 export function AssignmentsSection({ role }: { role: Role }) {
@@ -51,7 +57,8 @@ export function AssignmentsSection({ role }: { role: Role }) {
   const [modules, setModules] = useState<[string, string][]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<string>(role === "student" ? "mytasks" : "submissions")
+  const tabs = role === "admin" ? ADMIN_TABS : role === "student" ? STUDENT_TABS : ALL_TABS
+  const [tab, setTab] = useState<string>(role === "student" ? "mytasks" : role === "admin" ? "mytasks" : "submissions")
 
   useEffect(() => {
     let alive = true
@@ -97,7 +104,7 @@ export function AssignmentsSection({ role }: { role: Role }) {
         title="Assignments"
         description="Track submissions, due dates and grades in one place."
       />
-      <SectionTabs tabs={TABS} active={tab} onChange={setTab} />
+      <SectionTabs tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === "mytasks" && (
         <MyTasks
@@ -105,12 +112,13 @@ export function AssignmentsSection({ role }: { role: Role }) {
           submissions={submissions}
           setSubmissions={setSubmissionsSafe}
           me={me}
+          role={role}
         />
       )}
       {tab === "submissions" && role !== "student" && (
-        <GradeSubmissions assignments={assignments} submissions={submissions} setSubmissions={setSubmissionsSafe} />
+        <GradeSubmissions assignments={assignments} submissions={submissions} setSubmissions={setSubmissionsSafe} role={role} />
       )}
-      {tab === "manage" && role !== "student" && (
+      {tab === "manage" && role === "staff" && (
         <ManageAssignments assignments={assignments} setAssignments={setAssignmentsSafe} modules={modules} />
       )}
     </div>
@@ -122,11 +130,13 @@ function MyTasks({
   submissions,
   setSubmissions,
   me,
+  role,
 }: {
   assignments: Assignment[]
   submissions: Submission[]
   setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>
   me: UserProfile
+  role: Role
 }) {
   const [uploadFor, setUploadFor] = useState<Assignment | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -212,7 +222,7 @@ function MyTasks({
                   {sub.feedback && <p className="max-w-40 text-xs text-muted-foreground">{sub.feedback}</p>}
                 </div>
               )}
-              {(status === "pending" || status === "overdue") && (
+              {(status === "pending" || status === "overdue") && role !== "admin" && (
                 <button
                   onClick={() => setUploadFor(a)}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
@@ -265,10 +275,12 @@ function GradeSubmissions({
   assignments,
   submissions,
   setSubmissions,
+  role,
 }: {
   assignments: Assignment[]
   submissions: Submission[]
   setSubmissions: React.Dispatch<React.SetStateAction<Submission[]>>
+  role: Role
 }) {
   const [assignmentId, setAssignmentId] = useState(assignments[0]?.id ?? "")
   const [marks, setMarks] = useState<Record<string, string>>({})
@@ -318,27 +330,38 @@ function GradeSubmissions({
                 {sub.feedback && <p className="mt-1 text-xs text-muted-foreground">{sub.feedback}</p>}
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Marks"
-                  defaultValue={sub.marks ?? ""}
-                  onChange={(e) => setMarks((m) => ({ ...m, [sub.id]: e.target.value }))}
-                  aria-label={`Marks for ${sub.studentName}`}
-                  className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-primary"
-                />
-                <input
-                  placeholder="Feedback"
-                  defaultValue={sub.feedback}
-                  onChange={(e) => setFeedback((f) => ({ ...f, [sub.id]: e.target.value }))}
-                  aria-label={`Feedback for ${sub.studentName}`}
-                  className="w-40 rounded-sm border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-primary"
-                />
-                <button
-                  onClick={() => save(sub)}
-                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                >
-                  Save
-                </button>
+                {role === "admin" ? (
+                  <>
+                    {sub.marks != null && (
+                      <span className="font-mono text-sm font-bold text-primary">{sub.marks}/{assignments.find((a) => a.id === sub.assignmentId)?.maxMarks ?? "?"}</span>
+                    )}
+                    {sub.feedback && <span className="max-w-40 text-xs text-muted-foreground">{sub.feedback}</span>}
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      placeholder="Marks"
+                      defaultValue={sub.marks ?? ""}
+                      onChange={(e) => setMarks((m) => ({ ...m, [sub.id]: e.target.value }))}
+                      aria-label={`Marks for ${sub.studentName}`}
+                      className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 font-mono text-sm outline-none focus:border-primary"
+                    />
+                    <input
+                      placeholder="Feedback"
+                      defaultValue={sub.feedback}
+                      onChange={(e) => setFeedback((f) => ({ ...f, [sub.id]: e.target.value }))}
+                      aria-label={`Feedback for ${sub.studentName}`}
+                      className="w-40 rounded-sm border border-input bg-card px-2 py-1.5 text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={() => save(sub)}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                    >
+                      Save
+                    </button>
+                  </>
+                )}
               </div>
             </Card>
           ))}
