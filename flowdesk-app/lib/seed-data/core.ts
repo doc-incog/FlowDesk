@@ -81,14 +81,14 @@ export { DEFAULT_PASSWORD, SECTION_KEYS }
 /** Default section visibility per role — the seed for role_permissions. */
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   student: [
-    "overview", "checkin", "notifications", "mentor", "schedule", "exams",
+    "overview", "checkin", "notifications", "mentor", "chat", "schedule", "exams",
     "assignments", "fees", "scholarships", "helpdesk", "feedback", "profile",
   ],
   staff: [
-    "overview", "checkin", "notifications", "students", "mentor", "schedule",
+    "overview", "checkin", "notifications", "students", "mentor", "chat", "schedule",
     "exams", "assignments", "helpdesk", "feedback", "profile",
   ],
-  admin: [...SECTION_KEYS],
+  admin: SECTION_KEYS.filter((s) => s !== "mentor"),
 }
 
 export const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {

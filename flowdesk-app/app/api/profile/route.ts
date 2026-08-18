@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { findUserById, getDb, mapUser } from "@/lib/db"
 import { withPermissions } from "@/lib/permissions"
+import { DEFAULT_PASSWORD } from "@/lib/constants"
+import { createHash } from "node:crypto"
 
 export const runtime = "nodejs"
 
@@ -73,4 +75,42 @@ export async function PATCH(request: Request) {
 
   const updated = findUserById(user.id)
   return NextResponse.json({ user: updated ? withPermissions(mapUser(updated)) : null })
+}
+
+export async function POST(request: Request) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  let body: { currentPassword?: string; newPassword?: string } = {}
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
+  const currentPassword = body.currentPassword ?? ""
+  const newPassword = body.newPassword ?? ""
+
+  if (!currentPassword || !newPassword) {
+    return NextResponse.json({ error: "Current and new passwords are required" }, { status: 400 })
+  }
+
+  if (newPassword.length < 6) {
+    return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 })
+  }
+
+  const db = getDb()
+  const row = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(user.id) as { password_hash: string } | undefined
+  if (!row) return NextResponse.json({ error: "User not found" }, { status: 404 })
+
+  // Verify current password (hashed with SHA-256)
+  const currentHash = createHash("sha256").update(currentPassword).digest("hex")
+  if (row.password_hash !== currentHash) {
+    return NextResponse.json({ error: "Current password is incorrect" }, { status: 403 })
+  }
+
+  const newHash = createHash("sha256").update(newPassword).digest("hex")
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, user.id)
+
+  return NextResponse.json({ success: true })
 }

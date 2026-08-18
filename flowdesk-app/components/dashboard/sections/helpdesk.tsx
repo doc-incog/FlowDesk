@@ -186,24 +186,28 @@ function NewComplaint({
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button
-          onClick={() => {
+          onClick={async () => {
             if (!subject.trim() || !description.trim()) {
               setError("Subject and description are required.")
               return
             }
-            const c: Complaint = {
-              id: `CMP-${Math.floor(505 + Math.random() * 900)}`,
-              category,
-              subject: subject.trim(),
-              description: description.trim(),
-              status: "open",
-              createdAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-              raisedByName: me.name,
-              raisedByRole: role,
-              comments: [],
+            try {
+              const res = await fetch("/api/complaints", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category, subject: subject.trim(), description: description.trim() }),
+              })
+              const data = await res.json()
+              if (!res.ok || !data.complaint) throw new Error(data.error ?? "Failed to create complaint")
+              const c: Complaint = {
+                ...data.complaint,
+                comments: normalizeComments(data.complaint.comments ?? []),
+              }
+              setComplaints((prev) => [c, ...prev])
+              onCreated()
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to create complaint")
             }
-            setComplaints((prev) => [c, ...prev])
-            onCreated()
           }}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
         >
@@ -231,15 +235,34 @@ function ComplaintCard({
   const [expanded, setExpanded] = useState(false)
   const [comment, setComment] = useState("")
 
-  const addComment = () => {
+  const addComment = async () => {
     if (!comment.trim()) return
-    setComplaints((prev) =>
-      prev.map((c) =>
-        c.id === complaint.id
-          ? { ...c, comments: [...c.comments, `${me.name}: ${comment.trim()}`] }
-          : c,
-      ),
-    )
+    try {
+      const res = await fetch(`/api/complaints/${complaint.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: comment.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.complaint) {
+        setComplaints((prev) =>
+          prev.map((c) =>
+            c.id === complaint.id
+              ? { ...c, comments: normalizeComments(data.complaint.comments) }
+              : c,
+          ),
+        )
+      }
+    } catch {
+      // Optimistic fallback
+      setComplaints((prev) =>
+        prev.map((c) =>
+          c.id === complaint.id
+            ? { ...c, comments: [...c.comments, `${me.name}: ${comment.trim()}`] }
+            : c,
+        ),
+      )
+    }
     setComment("")
   }
 
@@ -305,9 +328,21 @@ function ComplaintCard({
                 </div>
                 {complaint.status !== "resolved" && (
                   <button
-                    onClick={() =>
-                      setComplaints((prev) => prev.map((c) => (c.id === complaint.id ? { ...c, status: "resolved" } : c)))
-                    }
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/complaints/${complaint.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status: "resolved" }),
+                        })
+                        const data = await res.json()
+                        if (res.ok && data.complaint) {
+                          setComplaints((prev) => prev.map((c) => (c.id === complaint.id ? { ...c, status: "resolved" as ComplaintStatus } : c)))
+                        }
+                      } catch {
+                        setComplaints((prev) => prev.map((c) => (c.id === complaint.id ? { ...c, status: "resolved" as ComplaintStatus } : c)))
+                      }
+                    }}
                     className="mt-2 rounded-sm border border-success/40 px-3 py-1.5 text-sm font-semibold text-success transition-colors hover:bg-success/10"
                   >
                     Mark resolved

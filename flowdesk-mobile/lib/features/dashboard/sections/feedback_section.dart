@@ -126,17 +126,10 @@ class _FeedbackGrid extends ConsumerWidget {
         .toList();
     final scheme = Theme.of(context).colorScheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = (constraints.maxWidth - 12) / 2;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final t in list)
-              SizedBox(
-                width: width,
-                child: GlassCard(
+    return ResponsiveGrid(
+      children: [
+        for (final t in list)
+          GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -183,11 +176,7 @@ class _FeedbackGrid extends ConsumerWidget {
                       ),
                     ],
                   ),
-                ),
-              ),
-          ],
-        );
-      },
+      ],
     );
   }
 }

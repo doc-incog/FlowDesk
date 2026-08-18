@@ -80,19 +80,35 @@ export function FeedbackSection() {
     setSubmitted(false)
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (!target) return
-    setEntries((prev) => [
-      ...(prev ?? []),
-      {
-        id: `F${Date.now()}`,
-        targetId: target.id,
-        rating,
-        comment: comment.trim(),
-        byName: me.name,
-        createdAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-      },
-    ])
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetId: target.id, rating, comment: comment.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.entry) {
+        setEntries((prev) => {
+          const filtered = (prev ?? []).filter((e) => e.targetId !== target.id)
+          return [...filtered, data.entry]
+        })
+      }
+    } catch {
+      // Optimistic fallback
+      setEntries((prev) => [
+        ...(prev ?? []),
+        {
+          id: `F${Date.now()}`,
+          targetId: target.id,
+          rating,
+          comment: comment.trim(),
+          byName: me.name,
+          createdAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
+        },
+      ])
+    }
     setSubmitted(true)
   }
 

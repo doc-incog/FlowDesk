@@ -6,10 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/utils/pdf_export.dart';
-import '../../../core/widgets/avatar.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../core/widgets/modal.dart';
-import '../../../core/widgets/section_heading.dart';
 import '../../../core/widgets/tabs.dart';
 import '../../../data/mock_data.dart' as mock;
 import '../../../models/fee.dart';
@@ -40,8 +39,10 @@ class _FeesSectionState extends ConsumerState<FeesSection> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(feesProvider);
-    final pending = state.items.where((f) => f.status == FeeStatus.pending).toList();
-    final paid = state.items.where((f) => f.status == FeeStatus.paid).toList();
+    final pending =
+        state.items.where((f) => f.status == FeeStatus.pending).toList();
+    final paid =
+        state.items.where((f) => f.status == FeeStatus.paid).toList();
     final totalDue = pending.fold<int>(0, (s, f) => s + f.amount);
     final totalPaid = paid.fold<int>(0, (s, f) => s + f.amount);
     final colors = Theme.of(context).extension<AppColors>()!;
@@ -49,7 +50,7 @@ class _FeesSectionState extends ConsumerState<FeesSection> {
     return SectionScaffold(
       title: 'Online Fees',
       description:
-          'Pay semester dues instantly — UPI, card or net banking. Digital receipts are generated automatically.',
+          'Pay semester dues instantly — e-wallet, card or net banking. Digital receipts are generated automatically.',
       children: [
         CardGrid(children: [
           StatCard(
@@ -100,7 +101,7 @@ class _PaymentSheet extends ConsumerStatefulWidget {
 
 class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
   _PayStep _step = _PayStep.method;
-  PaymentMethod _method = PaymentMethod.upi;
+  PaymentMethod _method = PaymentMethod.ewallet;
   Receipt? _newReceipt;
   Timer? _timer;
 
@@ -114,9 +115,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
     setState(() => _step = _PayStep.processing);
     _timer = Timer(const Duration(milliseconds: 1800), () {
       if (!mounted) return;
-      final result = ref
-          .read(feesProvider.notifier)
-          .pay(widget.fee, _method);
+      final result =
+          ref.read(feesProvider.notifier).pay(widget.fee, _method);
       setState(() {
         _newReceipt = result.receipts.first;
         _step = _PayStep.success;
@@ -151,7 +151,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
-                                ?.copyWith(color: scheme.onSurfaceVariant)),
+                                ?.copyWith(
+                                    color: scheme.onSurfaceVariant)),
                         Text(formatINR(fee.amount),
                             style: TextStyle(
                                 fontFamily: 'monospace',
@@ -174,9 +175,11 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
                     ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             for (final m in const [
-              (PaymentMethod.upi, 'UPI', Icons.smartphone_rounded),
-              (PaymentMethod.card, 'Card', Icons.credit_card_rounded),
-              (PaymentMethod.netbanking, 'Net Banking', Icons.account_balance_rounded),
+              (PaymentMethod.ewallet, 'E-Wallet', Icons.account_balance_wallet_rounded,
+                  'eSewa, Khalti, IME Pay'),
+              (PaymentMethod.card, 'Card', Icons.credit_card_rounded, 'Visa, Mastercard'),
+              (PaymentMethod.netbanking, 'Net Banking',
+                  Icons.account_balance_rounded, 'All major banks'),
             ])
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -189,9 +192,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: _method == m.$1
-                            ? colors.chart1
-                            : scheme.outline,
+                        color:
+                            _method == m.$1 ? colors.chart1 : scheme.outline,
                         width: _method == m.$1 ? 1.5 : 1,
                       ),
                       color: _method == m.$1
@@ -202,13 +204,23 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
                       children: [
                         Icon(m.$3, size: 20, color: colors.chart1),
                         const SizedBox(width: 10),
-                        Text(m.$2,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        if (_method == m.$1) ...[
-                          const Spacer(),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(m.$2,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              Text(m.$4,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: scheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        if (_method == m.$1)
                           Icon(Icons.check_circle_rounded,
                               size: 18, color: colors.chart1),
-                        ],
                       ],
                     ),
                   ),
@@ -218,7 +230,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                border: Border.all(color: scheme.outline, style: BorderStyle.solid),
+                border: Border.all(
+                    color: scheme.outline, style: BorderStyle.solid),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -255,7 +268,8 @@ class _PaymentSheetState extends ConsumerState<_PaymentSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 3, color: colors.chart1),
                     ),
-                    Icon(Icons.wallet_rounded, color: colors.chart1, size: 20),
+                    Icon(Icons.wallet_rounded,
+                        color: colors.chart1, size: 20),
                   ],
                 ),
               ),
@@ -334,7 +348,8 @@ class _Row extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+              style:
+                  TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
           Text(value,
               style: TextStyle(
                   fontFamily: mono ? 'monospace' : null,
@@ -346,6 +361,7 @@ class _Row extends StatelessWidget {
   }
 }
 
+/// Responsive dues display — card list on compact, table on medium+.
 class _DuesTable extends StatelessWidget {
   const _DuesTable({
     required this.items,
@@ -359,7 +375,114 @@ class _DuesTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = ResponsiveLayout.isCompact(context);
+    if (isCompact) return _DuesCardList(items: items, colors: colors, onPay: onPay);
+    return _DuesDataTable(items: items, colors: colors, onPay: onPay);
+  }
+}
+
+class _DuesCardList extends StatelessWidget {
+  const _DuesCardList({
+    required this.items,
+    required this.colors,
+    required this.onPay,
+  });
+
+  final List<FeeItem> items;
+  final AppColors colors;
+  final ValueChanged<FeeItem> onPay;
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+
+    return Column(
+      children: [
+        for (final f in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(f.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700)),
+                      ),
+                      f.status == FeeStatus.paid
+                          ? Pill(
+                              text: 'Paid · ${f.method?.label ?? 'E-Wallet'}',
+                              color: colors.success,
+                              compact: true)
+                          : _OverduePill(
+                              dueDate: f.dueDate,
+                              now: now,
+                              colors: colors),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(formatINR(f.amount),
+                          style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16)),
+                      const Spacer(),
+                      Text('Due: ${f.dueDate}',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                  if (f.status == FeeStatus.paid && f.receiptId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('Receipt: ${f.receiptId}',
+                          style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              color: scheme.onSurfaceVariant)),
+                    ),
+                  if (f.status == FeeStatus.pending) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => onPay(f),
+                        child: const Text('Pay now'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DuesDataTable extends StatelessWidget {
+  const _DuesDataTable({
+    required this.items,
+    required this.colors,
+    required this.onPay,
+  });
+
+  final List<FeeItem> items;
+  final AppColors colors;
+  final ValueChanged<FeeItem> onPay;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+
     return GlassCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -369,23 +492,28 @@ class _DuesTable extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(flex: 3, child: _header(context, 'Fee item')),
-                Expanded(flex: 2, child: _header(context, 'Amount', right: true)),
+                Expanded(
+                    flex: 2, child: _header(context, 'Amount', right: true)),
                 Expanded(flex: 2, child: _header(context, 'Due date')),
                 Expanded(flex: 2, child: _header(context, 'Status')),
-                Expanded(flex: 2, child: _header(context, 'Action', right: true)),
+                Expanded(
+                    flex: 2,
+                    child: _header(context, 'Action', right: true)),
               ],
             ),
           ),
           const Divider(height: 1),
           for (final f in items)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
                   Expanded(
                       flex: 3,
                       child: Text(f.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600))),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600))),
                   Expanded(
                     flex: 2,
                     child: Text(formatINR(f.amount),
@@ -398,19 +526,21 @@ class _DuesTable extends StatelessWidget {
                     flex: 2,
                     child: Text(f.dueDate,
                         style: TextStyle(
-                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant)),
                   ),
                   Expanded(
                     flex: 2,
                     child: f.status == FeeStatus.paid
                         ? Pill(
-                            text: 'Paid · ${f.method?.label ?? 'UPI'}',
+                            text:
+                                'Paid · ${f.method?.label ?? 'E-Wallet'}',
                             color: colors.success,
                             compact: true)
-                        : Pill(
-                            text: 'Pending',
-                            color: colors.warning,
-                            compact: true),
+                        : _OverduePill(
+                            dueDate: f.dueDate,
+                            now: now,
+                            colors: colors),
                   ),
                   Expanded(
                     flex: 2,
@@ -455,6 +585,37 @@ class _DuesTable extends StatelessWidget {
       );
 }
 
+class _OverduePill extends StatelessWidget {
+  const _OverduePill({
+    required this.dueDate,
+    required this.now,
+    required this.colors,
+  });
+
+  final String dueDate;
+  final DateTime now;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOverdue = _parseDate(dueDate).isBefore(now);
+    return Pill(
+      text: isOverdue ? 'Overdue' : 'Pending',
+      color: isOverdue ? colors.chart4 : colors.warning,
+      compact: true,
+    );
+  }
+
+  DateTime _parseDate(String date) {
+    try {
+      return DateTime.parse(date);
+    } catch (_) {
+      return DateTime(2099);
+    }
+  }
+}
+
+/// Responsive receipts list — stacked cards on compact, rows on medium+.
 class _ReceiptsList extends StatelessWidget {
   const _ReceiptsList({required this.receipts});
 
@@ -478,6 +639,8 @@ class _ReceiptsList extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<AppColors>()!;
     final scheme = Theme.of(context).colorScheme;
+    final isCompact = ResponsiveLayout.isCompact(context);
+
     if (receipts.isEmpty) {
       return const GlassCard(child: EmptyState(message: 'No receipts yet.'));
     }
@@ -487,54 +650,147 @@ class _ReceiptsList extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GlassCard(
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.receipt_long_rounded,
-                        size: 22, color: scheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(r.itemName,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text(
-                          '${r.id} · ${r.transactionId} · ${r.date}',
-                          style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(formatINR(r.amount),
-                      style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15)),
-                  const SizedBox(width: 10),
-                  Pill(text: r.method.label, color: colors.chart5, compact: true),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    onPressed: () => _download(context, r),
-                    icon: Icon(Icons.download_rounded,
-                        size: 20, color: colors.chart1),
-                    tooltip: 'Download receipt',
-                  ),
-                ],
-              ),
+              child: isCompact
+                  ? _ReceiptCard(
+                      receipt: r, colors: colors, scheme: scheme,
+                      onDownload: () => _download(context, r))
+                  : _ReceiptRow(
+                      receipt: r, colors: colors, scheme: scheme,
+                      onDownload: () => _download(context, r)),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _ReceiptCard extends StatelessWidget {
+  const _ReceiptCard({
+    required this.receipt,
+    required this.colors,
+    required this.scheme,
+    required this.onDownload,
+  });
+
+  final Receipt receipt;
+  final AppColors colors;
+  final ColorScheme scheme;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: Icon(Icons.receipt_long_rounded,
+                  size: 18, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(receipt.itemName,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            Text(formatINR(receipt.amount),
+                style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${receipt.id} · ${receipt.transactionId} · ${receipt.date}',
+          style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Pill(text: receipt.method.label, color: colors.chart5, compact: true),
+            const Spacer(),
+            IconButton(
+              onPressed: onDownload,
+              icon: Icon(Icons.download_rounded,
+                  size: 20, color: colors.chart1),
+              tooltip: 'Download receipt',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ReceiptRow extends StatelessWidget {
+  const _ReceiptRow({
+    required this.receipt,
+    required this.colors,
+    required this.scheme,
+    required this.onDownload,
+  });
+
+  final Receipt receipt;
+  final AppColors colors;
+  final ColorScheme scheme;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Icon(Icons.receipt_long_rounded,
+              size: 22, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(receipt.itemName,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                '${receipt.id} · ${receipt.transactionId} · ${receipt.date}',
+                style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+        Text(formatINR(receipt.amount),
+            style: const TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700,
+                fontSize: 15)),
+        const SizedBox(width: 10),
+        Pill(text: receipt.method.label, color: colors.chart5, compact: true),
+        const SizedBox(width: 4),
+        IconButton(
+          onPressed: onDownload,
+          icon: Icon(Icons.download_rounded,
+              size: 20, color: colors.chart1),
+          tooltip: 'Download receipt',
+        ),
       ],
     );
   }

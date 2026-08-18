@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/responsive.dart';
+import '../../core/widgets/glass.dart';
+
 /// Standard vertical rhythm for a section page.
 class SectionScaffold extends StatelessWidget {
   const SectionScaffold({
@@ -51,7 +54,7 @@ class SectionScaffold extends StatelessWidget {
   }
 }
 
-/// Two-column responsive card grid.
+/// Responsive card grid — adapts column count to screen width.
 class CardGrid extends StatelessWidget {
   const CardGrid({super.key, required this.children, this.spacing = 12});
 
@@ -60,9 +63,33 @@ class CardGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final columns = responsiveColumns(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = (constraints.maxWidth - spacing) / 2;
+        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [for (final c in children) SizedBox(width: width, child: c)],
+        );
+      },
+    );
+  }
+}
+
+/// Responsive card grid that can also be used by external sections (feedback, scholarships).
+class ResponsiveGrid extends StatelessWidget {
+  const ResponsiveGrid({super.key, required this.children, this.spacing = 12});
+
+  final List<Widget> children;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = responsiveColumns(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,

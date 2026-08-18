@@ -258,5 +258,32 @@ export function createSchema(db: DatabaseSync) {
       data BLOB NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'direct',
+      title TEXT,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_participants (
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TEXT NOT NULL,
+      last_read_at TEXT,
+      PRIMARY KEY (conversation_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      sender_id TEXT NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'text',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
   `)
 }

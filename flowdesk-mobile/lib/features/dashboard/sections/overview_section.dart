@@ -162,7 +162,7 @@ class OverviewSection extends ConsumerWidget {
             ],
           ),
         ),
-        if (role != Role.student) ...[
+        if (role == Role.staff) ...[
           SectionHeading(title: 'Recent student check-ins'),
           GlassCard(
             padding: EdgeInsets.zero,

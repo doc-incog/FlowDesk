@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertCircle, BadgeCheck, Banknote, CheckCircle2, Download, Landmark, Lock, Receipt as ReceiptIcon, Smartphone, Wallet, CreditCard } from "lucide-react"
+import { AlertCircle, BadgeCheck, Banknote, CheckCircle2, Download, Landmark, Lock, Receipt as ReceiptIcon, Wallet, CreditCard } from "lucide-react"
 import type { UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -22,7 +22,7 @@ async function downloadReceipt(id: string) {
   URL.revokeObjectURL(url)
 }
 
-type PaymentMethod = "upi" | "card" | "netbanking" | "cash"
+type PaymentMethod = "ewallet" | "card" | "netbanking" | "cash"
 
 type FeeItem = {
   id: string
@@ -51,7 +51,7 @@ function formatINR(n: number): string {
 }
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
-  upi: "UPI",
+  ewallet: "E-Wallet",
   card: "Card",
   netbanking: "Net Banking",
   cash: "Cash",
@@ -62,10 +62,19 @@ const TABS: TabItem[] = [
   { id: "receipts", label: "Receipts" },
 ]
 
-const METHODS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
-  { id: "upi", label: "UPI", icon: <Smartphone className="h-4 w-4" aria-hidden /> },
-  { id: "card", label: "Card", icon: <CreditCard className="h-4 w-4" aria-hidden /> },
-  { id: "netbanking", label: "Net Banking", icon: <Landmark className="h-4 w-4" aria-hidden /> },
+function isOverdue(dueDate: string): boolean {
+  try {
+    const d = new Date(dueDate)
+    return d.getTime() < Date.now()
+  } catch {
+    return false
+  }
+}
+
+const METHODS: { id: PaymentMethod; label: string; icon: React.ReactNode; sub: string }[] = [
+  { id: "ewallet", label: "E-Wallet", icon: <Wallet className="h-4 w-4" aria-hidden />, sub: "eSewa, Khalti, IME Pay" },
+  { id: "card", label: "Card", icon: <CreditCard className="h-4 w-4" aria-hidden />, sub: "Visa, Mastercard" },
+  { id: "netbanking", label: "Net Banking", icon: <Landmark className="h-4 w-4" aria-hidden />, sub: "All major banks" },
 ]
 
 export function FeesSection() {
@@ -77,7 +86,7 @@ export function FeesSection() {
   const [tab, setTab] = useState<string>("dues")
   const [paying, setPaying] = useState<FeeItem | null>(null)
   const [step, setStep] = useState<"method" | "processing" | "success">("method")
-  const [method, setMethod] = useState<PaymentMethod>("upi")
+  const [method, setMethod] = useState<PaymentMethod>("ewallet")
   const [newReceipt, setNewReceipt] = useState<Receipt | null>(null)
   const [payError, setPayError] = useState<string | null>(null)
 
@@ -115,7 +124,7 @@ export function FeesSection() {
 
   const startPay = (fee: FeeItem) => {
     setPaying(fee)
-    setMethod("upi")
+    setMethod("ewallet")
     setStep("method")
     setNewReceipt(null)
     setPayError(null)
@@ -160,7 +169,7 @@ export function FeesSection() {
     <div className="space-y-6">
       <SectionHeading
         title="Online Fees"
-        description="Pay semester dues instantly — UPI, card or net banking. Digital receipts are generated automatically."
+        description="Pay semester dues instantly — e-wallet, card or net banking. Digital receipts are generated automatically."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -197,8 +206,10 @@ export function FeesSection() {
                     <td className="py-3">
                       {f.status === "paid" ? (
                         <span className="pill bg-success/10 text-success">
-                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Paid · {METHOD_LABEL[f.method ?? "upi"]}
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Paid · {METHOD_LABEL[f.method ?? "ewallet"]}
                         </span>
+                      ) : isOverdue(f.dueDate) ? (
+                        <span className="pill bg-destructive/10 text-destructive">Overdue</span>
                       ) : (
                         <span className="pill bg-warning/15 text-warning">Pending</span>
                       )}
@@ -253,7 +264,10 @@ export function FeesSection() {
                   )}
                 >
                   <span className="text-primary">{m.icon}</span>
-                  {m.label}
+                  <span className="flex flex-col items-start">
+                    <span>{m.label}</span>
+                    <span className="text-xs text-muted-foreground">{m.sub}</span>
+                  </span>
                   {method === m.id && <CheckCircle2 className="ml-auto h-4 w-4 text-primary" aria-hidden />}
                 </button>
               ))}
