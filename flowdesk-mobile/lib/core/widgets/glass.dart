@@ -28,7 +28,7 @@ class GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fill = color ?? scheme.surface.withValues(alpha: 0.72);
-    final isPhone = ResponsiveLayout.isCompact(context);
+    final isPhone = Breakpoints.isPhone(context);
     final blur = isPhone ? 12.0 : 18.0;
 
     Widget content = Container(

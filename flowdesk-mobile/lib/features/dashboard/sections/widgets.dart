@@ -20,7 +20,7 @@ class SectionScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isWide = !ResponsiveLayout.isCompact(context);
+    final isWide = Breakpoints.isWide(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,42 +54,26 @@ class SectionScaffold extends StatelessWidget {
   }
 }
 
-/// Responsive card grid — adapts column count to screen width.
+/// Responsive card grid — adapts columns based on screen width.
 class CardGrid extends StatelessWidget {
   const CardGrid({super.key, required this.children, this.spacing = 12});
 
   final List<Widget> children;
   final double spacing;
 
-  @override
-  Widget build(BuildContext context) {
-    final columns = responsiveColumns(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [for (final c in children) SizedBox(width: width, child: c)],
-        );
-      },
-    );
+  int _columnCount(double width) {
+    if (width >= Breakpoints.wide) return 4;
+    if (width >= Breakpoints.tablet) return 3;
+    if (width >= Breakpoints.phone) return 2;
+    return 2;
   }
-}
-
-/// Responsive card grid that can also be used by external sections (feedback, scholarships).
-class ResponsiveGrid extends StatelessWidget {
-  const ResponsiveGrid({super.key, required this.children, this.spacing = 12});
-
-  final List<Widget> children;
-  final double spacing;
 
   @override
   Widget build(BuildContext context) {
-    final columns = responsiveColumns(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        final cols = _columnCount(constraints.maxWidth);
+        final width = (constraints.maxWidth - spacing * (cols - 1)) / cols;
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,

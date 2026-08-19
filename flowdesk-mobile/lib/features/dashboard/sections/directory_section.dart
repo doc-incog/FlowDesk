@@ -66,7 +66,7 @@ class _DirectorySectionState extends ConsumerState<DirectorySection> {
   }
 
   void _showDetail(UserProfile person) {
-    final isWide = !ResponsiveLayout.isCompact(context);
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
     if (isWide) {
       setState(() => _selectedPerson = person);
       return;
@@ -167,7 +167,7 @@ class _DirectorySectionState extends ConsumerState<DirectorySection> {
           (p.rollNo?.toLowerCase().contains(q) ?? false);
     }).toList();
 
-    final isWide = !ResponsiveLayout.isCompact(context);
+    final isWide = Breakpoints.isWide(context) || Breakpoints.isTablet(context);
 
     if (isWide && _selectedPerson != null) {
       return Row(
@@ -224,7 +224,7 @@ class _DirectorySectionState extends ConsumerState<DirectorySection> {
               label: const Text('Add'),
             ),
           ),
-        if (_selectedPerson != null && ResponsiveLayout.isCompact(context))
+        if (_selectedPerson != null && Breakpoints.isPhone(context))
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Align(

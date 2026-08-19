@@ -85,10 +85,17 @@ class _BrowseGrid extends ConsumerWidget {
     final scholarships = ref.watch(scholarshipsProvider);
     final colors = Theme.of(context).extension<AppColors>()!;
 
-    return ResponsiveGrid(
-      children: [
-        for (final s in scholarships)
-          GlassCard(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 12) / 2;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final s in scholarships)
+              SizedBox(
+                width: width,
+                child: GlassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -133,7 +140,10 @@ class _BrowseGrid extends ConsumerWidget {
                     ],
                   ),
                 ),
-      ],
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -4,14 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass.dart';
 import '../../../models/notification_item.dart';
-import '../../../models/role.dart';
 import '../../../providers/notifications_controller.dart';
 import 'widgets.dart';
 
 class NotificationsSection extends ConsumerStatefulWidget {
-  const NotificationsSection({super.key, required this.role});
-
-  final Role role;
+  const NotificationsSection({super.key});
 
   @override
   ConsumerState<NotificationsSection> createState() => _NotificationsSectionState();
@@ -19,21 +16,6 @@ class NotificationsSection extends ConsumerStatefulWidget {
 
 class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
   NotificationCategory? _filter;
-  bool _composing = false;
-  final _titleCtrl = TextEditingController();
-  final _bodyCtrl = TextEditingController();
-  NotificationCategory _composeCategory = NotificationCategory.system;
-  String _composeTarget = 'all';
-  bool _sending = false;
-  String? _sendError;
-  bool _sendSuccess = false;
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _bodyCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,126 +29,12 @@ class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
     return SectionScaffold(
       title: 'Notifications',
       description: 'Announcements and alerts from across the campus.',
-      action: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.role == Role.admin)
-            TextButton.icon(
-              onPressed: () => setState(() => _composing = !_composing),
-              icon: const Icon(Icons.send_rounded, size: 16),
-              label: const Text('Send'),
-            ),
-          TextButton.icon(
-            onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
-            icon: const Icon(Icons.done_all_rounded, size: 16),
-            label: const Text('Mark all read'),
-          ),
-        ],
+      action: TextButton.icon(
+        onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
+        icon: const Icon(Icons.done_all_rounded, size: 16),
+        label: const Text('Mark all read'),
       ),
       children: [
-        // Admin compose form
-        if (widget.role == Role.admin && _composing)
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Compose notification',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                const SizedBox(height: 4),
-                Text('Send to students, staff, or everyone.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
-                    hintText: 'e.g. Campus holiday announcement',
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _bodyCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Message',
-                    hintText: 'Notification details…',
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<NotificationCategory>(
-                        value: _composeCategory,
-                        decoration: const InputDecoration(
-                            labelText: 'Category', isDense: true),
-                        items: const [
-                          DropdownMenuItem(
-                              value: NotificationCategory.academic,
-                              child: Text('Academic')),
-                          DropdownMenuItem(
-                              value: NotificationCategory.event,
-                              child: Text('Event')),
-                          DropdownMenuItem(
-                              value: NotificationCategory.alert,
-                              child: Text('Alert')),
-                          DropdownMenuItem(
-                              value: NotificationCategory.system,
-                              child: Text('System')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _composeCategory = v);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _composeTarget,
-                        decoration: const InputDecoration(
-                            labelText: 'Send to', isDense: true),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'all', child: Text('Everyone')),
-                          DropdownMenuItem(
-                              value: 'students', child: Text('Students')),
-                          DropdownMenuItem(
-                              value: 'staff', child: Text('Staff')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _composeTarget = v);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                if (_sendError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(_sendError!,
-                      style: TextStyle(color: scheme.error, fontSize: 12)),
-                ],
-                if (_sendSuccess) ...[
-                  const SizedBox(height: 8),
-                  Text('Notification sent!',
-                      style: TextStyle(
-                          color: colors.success,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                ],
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: _titleCtrl.text.trim().isEmpty || _sending
-                      ? null
-                      : _send,
-                  icon: const Icon(Icons.send_rounded, size: 18),
-                  label: Text(_sending ? 'Sending…' : 'Send notification'),
-                ),
-              ],
-            ),
-          ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -246,42 +114,6 @@ class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
             ),
       ],
     );
-  }
-
-  Future<void> _send() async {
-    final title = _titleCtrl.text.trim();
-    if (title.isEmpty) return;
-    setState(() {
-      _sending = true;
-      _sendError = null;
-      _sendSuccess = false;
-    });
-
-    // Simulate sending (mock — in production this would call the API)
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // Add the notification to the local list
-    ref.read(notificationsProvider.notifier).addNotification(
-          NotificationItem(
-            id: 'n-${DateTime.now().millisecondsSinceEpoch}',
-            title: title,
-            body: _bodyCtrl.text.trim(),
-            time: 'Just now',
-            category: _composeCategory,
-            unread: true,
-          ),
-        );
-
-    _titleCtrl.clear();
-    _bodyCtrl.clear();
-    setState(() {
-      _sending = false;
-      _sendSuccess = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _sendSuccess = false);
-    });
   }
 
   Widget _filterChip(BuildContext context, NotificationCategory? c, String label) {

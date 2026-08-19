@@ -1,4 +1,4 @@
-enum PaymentMethod { upi, ewallet, card, netbanking, cash }
+enum PaymentMethod { upi, card, netbanking, cash }
 
 class FeeItem {
   const FeeItem({
@@ -91,7 +91,7 @@ class Receipt {
         date: json['date'] as String,
         method: PaymentMethod.values.firstWhere(
             (m) => m.name == json['method'],
-            orElse: () => PaymentMethod.ewallet),
+            orElse: () => PaymentMethod.upi),
         transactionId: json['transactionId'] as String,
       );
 }
@@ -99,7 +99,6 @@ class Receipt {
 extension PaymentMethodX on PaymentMethod {
   String get label => switch (this) {
         PaymentMethod.upi => 'UPI',
-        PaymentMethod.ewallet => 'E-Wallet',
         PaymentMethod.card => 'Card',
         PaymentMethod.netbanking => 'Net Banking',
         PaymentMethod.cash => 'Cash',

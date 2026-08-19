@@ -31,9 +31,7 @@ class _AssignmentsSectionState extends ConsumerState<AssignmentsSection> {
 
   List<_AssignmentsTab> get _tabs => widget.role == Role.student
       ? const [_AssignmentsTab.mytasks]
-      : widget.role == Role.admin
-          ? const [_AssignmentsTab.mytasks, _AssignmentsTab.submissions]
-          : const [_AssignmentsTab.submissions, _AssignmentsTab.manage];
+      : const [_AssignmentsTab.submissions, _AssignmentsTab.manage];
 
   String _label(_AssignmentsTab t) => switch (t) {
         _AssignmentsTab.mytasks => 'My tasks',
@@ -45,7 +43,6 @@ class _AssignmentsSectionState extends ConsumerState<AssignmentsSection> {
   void initState() {
     super.initState();
     if (widget.role == Role.student) _tab = _AssignmentsTab.mytasks;
-    if (widget.role == Role.admin) _tab = _AssignmentsTab.mytasks;
   }
 
   @override
@@ -61,8 +58,8 @@ class _AssignmentsSectionState extends ConsumerState<AssignmentsSection> {
           labels: _label,
         ),
         switch (_tab) {
-          _AssignmentsTab.mytasks => _MyTasks(role: widget.role),
-          _AssignmentsTab.submissions => _GradeSubmissions(role: widget.role),
+          _AssignmentsTab.mytasks => const _MyTasks(),
+          _AssignmentsTab.submissions => const _GradeSubmissions(),
           _AssignmentsTab.manage => const _ManageAssignments(),
         },
       ],
@@ -71,9 +68,7 @@ class _AssignmentsSectionState extends ConsumerState<AssignmentsSection> {
 }
 
 class _MyTasks extends ConsumerStatefulWidget {
-  const _MyTasks({required this.role});
-
-  final Role role;
+  const _MyTasks();
 
   @override
   ConsumerState<_MyTasks> createState() => _MyTasksState();
@@ -211,17 +206,15 @@ class _MyTasksState extends ConsumerState<_MyTasks> {
                   ],
                   if (item.status == AssignmentStatus.pending ||
                       item.status == AssignmentStatus.overdue) ...[
-                    if (widget.role != Role.admin) ...[
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          onPressed: () => _openUpload(context, item.assignment),
-                          icon: const Icon(Icons.upload_rounded, size: 18),
-                          label: const Text('Submit'),
-                        ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                        onPressed: () => _openUpload(context, item.assignment),
+                        icon: const Icon(Icons.upload_rounded, size: 18),
+                        label: const Text('Submit'),
                       ),
-                    ],
+                    ),
                   ],
                 ],
               ),
@@ -330,9 +323,7 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _GradeSubmissions extends ConsumerStatefulWidget {
-  const _GradeSubmissions({required this.role});
-
-  final Role role;
+  const _GradeSubmissions();
 
   @override
   ConsumerState<_GradeSubmissions> createState() => _GradeSubmissionsState();
@@ -371,7 +362,6 @@ class _GradeSubmissionsState extends ConsumerState<_GradeSubmissions> {
   Widget build(BuildContext context) {
     final assignments = ref.watch(assignmentsProvider);
     final submissions = ref.watch(submissionsProvider);
-    final colors = Theme.of(context).extension<AppColors>()!;
     final list = submissions
         .where((s) => s.assignmentId == _assignmentId)
         .toList();
@@ -421,74 +411,49 @@ class _GradeSubmissionsState extends ConsumerState<_GradeSubmissions> {
                           style: Theme.of(context).textTheme.bodySmall),
                     ],
                     const SizedBox(height: 10),
-                    if (widget.role == Role.admin)
-                      // Admin view: read-only marks display
-                      Row(
-                        children: [
-                          if (s.marks != null)
-                            Text(
-                              '${s.marks} / ${assignments.firstWhere((a) => a.id == s.assignmentId).maxMarks}',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: colors.success,
-                              ),
-                            ),
-                          if (s.feedback.isNotEmpty) ...[
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(s.feedback,
-                                  style: Theme.of(context).textTheme.bodySmall),
-                            ),
-                          ],
-                        ],
-                      )
-                    else
-                      // Staff view: editable grading
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _marks[s.id],
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(3),
-                              ],
-                              decoration: const InputDecoration(
-                                  labelText: 'Marks', isDense: true),
-                            ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _marks[s.id],
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
+                            decoration: const InputDecoration(
+                                labelText: 'Marks', isDense: true),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: TextField(
-                              controller: _feedback[s.id],
-                              decoration: const InputDecoration(
-                                  labelText: 'Feedback', isDense: true),
-                            ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _feedback[s.id],
+                            decoration: const InputDecoration(
+                                labelText: 'Feedback', isDense: true),
                           ),
-                          const SizedBox(width: 10),
-                          FilledButton(
-                            onPressed: () {
-                              ref
-                                  .read(submissionsProvider.notifier)
-                                  .grade(
-                                    s.id,
-                                    int.tryParse(_marks[s.id]?.text ?? '') ?? 0,
-                                    _feedback[s.id]?.text ?? '',
-                                  );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content:
-                                        Text('Marks saved for ${s.studentName}.')),
-                              );
-                            },
-                            child: const Text('Save'),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 10),
+                        FilledButton(
+                          onPressed: () {
+                            ref
+                                .read(submissionsProvider.notifier)
+                                .grade(
+                                  s.id,
+                                  int.tryParse(_marks[s.id]?.text ?? '') ?? 0,
+                                  _feedback[s.id]?.text ?? '',
+                                );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text('Marks saved for ${s.studentName}.')),
+                            );
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
