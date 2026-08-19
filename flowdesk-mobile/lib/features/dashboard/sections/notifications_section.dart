@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/glass.dart';
+import '../../../core/widgets/modal.dart';
 import '../../../models/notification_item.dart';
+import '../../../models/role.dart';
+import '../../../providers/auth_controller.dart';
 import '../../../providers/notifications_controller.dart';
 import 'widgets.dart';
 
@@ -17,9 +20,31 @@ class NotificationsSection extends ConsumerStatefulWidget {
 class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
   NotificationCategory? _filter;
 
+  void _compose() {
+    showAppModal(
+      context: context,
+      title: 'Send notification',
+      child: _ComposeForm(
+        onSend: (title, body, category) {
+          ref.read(notificationsProvider.notifier).send(
+                title: title,
+                body: body,
+                category: category,
+              );
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Notification sent.')),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
+    final user = ref.watch(authProvider);
+    final isAdmin = user?.role == Role.admin;
     final filtered = _filter == null
         ? notifications
         : notifications.where((n) => n.category == _filter).toList();
@@ -29,10 +54,23 @@ class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
     return SectionScaffold(
       title: 'Notifications',
       description: 'Announcements and alerts from across the campus.',
-      action: TextButton.icon(
-        onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
-        icon: const Icon(Icons.done_all_rounded, size: 16),
-        label: const Text('Mark all read'),
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton.icon(
+            onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
+            icon: const Icon(Icons.done_all_rounded, size: 16),
+            label: const Text('Mark all read'),
+          ),
+          if (isAdmin) ...[
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _compose,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Compose'),
+            ),
+          ],
+        ],
       ),
       children: [
         SingleChildScrollView(
@@ -165,4 +203,65 @@ class _NotificationsSectionState extends ConsumerState<NotificationsSection> {
         NotificationCategory.alert => colors.warning,
         NotificationCategory.system => colors.chart5,
       };
+}
+
+class _ComposeForm extends StatefulWidget {
+  const _ComposeForm({required this.onSend});
+
+  final void Function(String title, String body, NotificationCategory category) onSend;
+
+  @override
+  State<_ComposeForm> createState() => _ComposeFormState();
+}
+
+class _ComposeFormState extends State<_ComposeForm> {
+  final _titleCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  NotificationCategory _category = NotificationCategory.academic;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _titleCtrl,
+          decoration: const InputDecoration(labelText: 'Title'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _bodyCtrl,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Message'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<NotificationCategory>(
+          initialValue: _category,
+          decoration: const InputDecoration(labelText: 'Category'),
+          items: NotificationCategory.values
+              .map((c) => DropdownMenuItem(
+                    value: c,
+                    child: Text(c.name[0].toUpperCase() + c.name.substring(1)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _category = v!),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: () {
+            if (_titleCtrl.text.trim().isEmpty || _bodyCtrl.text.trim().isEmpty) return;
+            widget.onSend(_titleCtrl.text.trim(), _bodyCtrl.text.trim(), _category);
+          },
+          child: const Text('Send notification'),
+        ),
+      ],
+    );
+  }
 }

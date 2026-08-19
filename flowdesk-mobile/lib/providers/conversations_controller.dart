@@ -139,6 +139,14 @@ class ConversationsController extends StateNotifier<ConversationsState> {
   void clearActive() {
     state = state.copyWith(activeConversationId: null, messages: []);
   }
+
+  void refreshMessages() {
+    if (state.activeConversationId == null) return;
+    final current = demoMessages[state.activeConversationId] ?? [];
+    if (current.length > state.messages.length) {
+      state = state.copyWith(messages: current);
+    }
+  }
 }
 
 final conversationsProvider =

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,14 +24,26 @@ class _ChatSectionState extends ConsumerState<ChatSection> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
+  final _convFilterController = TextEditingController();
   List<UserProfile> _searchResults = [];
   bool _showNewChat = false;
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      ref.read(conversationsProvider.notifier).refreshMessages();
+    });
+  }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _inputController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
+    _convFilterController.dispose();
     super.dispose();
   }
 
@@ -86,6 +100,8 @@ class _ChatSectionState extends ConsumerState<ChatSection> {
             _searchResults = [];
           });
         },
+        filterController: _convFilterController,
+        filterQuery: _convFilterController.text,
       );
     }
 
@@ -122,6 +138,8 @@ class _ChatSectionState extends ConsumerState<ChatSection> {
           _searchResults = [];
         });
       },
+      filterController: _convFilterController,
+      filterQuery: _convFilterController.text,
     );
   }
 }
@@ -151,6 +169,8 @@ class _ConversationList extends StatelessWidget {
     required this.searchResults,
     required this.onSearch,
     required this.onStartConversation,
+    required this.filterController,
+    required this.filterQuery,
   });
 
   final ConversationsState state;
@@ -164,9 +184,18 @@ class _ConversationList extends StatelessWidget {
   final List<UserProfile> searchResults;
   final ValueChanged<String> onSearch;
   final ValueChanged<UserProfile> onStartConversation;
+  final TextEditingController filterController;
+  final String filterQuery;
 
   @override
   Widget build(BuildContext context) {
+    final q = filterQuery.toLowerCase();
+    final filtered = q.isEmpty
+        ? state.conversations
+        : state.conversations
+            .where((c) => c.title.toLowerCase().contains(q))
+            .toList();
+
     return SectionScaffold(
       title: 'Messages',
       description: 'Chat with students, staff, and administrators.',
@@ -176,6 +205,22 @@ class _ConversationList extends StatelessWidget {
         label: Text(showNewChat ? 'Cancel' : 'New chat'),
       ),
       children: [
+        if (!showNewChat)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: filterController,
+              onChanged: (_) {},
+              decoration: InputDecoration(
+                hintText: 'Search conversations…',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
         if (showNewChat) ...[
           GlassCard(
             child: Column(
@@ -220,7 +265,7 @@ class _ConversationList extends StatelessWidget {
             ),
           ),
         ],
-        if (state.conversations.isEmpty)
+        if (filtered.isEmpty)
           const GlassCard(
             child: EmptyState(
               message: 'No conversations yet. Start one by tapping "New chat".',
@@ -228,7 +273,7 @@ class _ConversationList extends StatelessWidget {
             ),
           )
         else
-          for (final conv in state.conversations)
+          for (final conv in filtered)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: GlassCard(
@@ -540,6 +585,8 @@ class _WideLayout extends StatelessWidget {
     required this.searchResults,
     required this.onSearch,
     required this.onStartConversation,
+    required this.filterController,
+    required this.filterQuery,
   });
 
   final ConversationsState state;
@@ -557,6 +604,8 @@ class _WideLayout extends StatelessWidget {
   final List<UserProfile> searchResults;
   final ValueChanged<String> onSearch;
   final ValueChanged<UserProfile> onStartConversation;
+  final TextEditingController filterController;
+  final String filterQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -576,6 +625,8 @@ class _WideLayout extends StatelessWidget {
             searchResults: searchResults,
             onSearch: onSearch,
             onStartConversation: onStartConversation,
+            filterController: filterController,
+            filterQuery: filterQuery,
           ),
         ),
         const VerticalDivider(width: 1),

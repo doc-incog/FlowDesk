@@ -8,6 +8,7 @@ import '../../../core/widgets/section_heading.dart';
 import '../../../data/mock_data.dart' as mock;
 import '../../../models/check_in.dart';
 import '../../../models/role.dart';
+import '../../../providers/checkin_controller.dart';
 import '../../../providers/notifications_controller.dart';
 import 'widgets.dart';
 import '../section.dart';
@@ -25,30 +26,45 @@ class OverviewSection extends ConsumerWidget {
     return 'Good evening';
   }
 
+  String _dayName(int weekday) => switch (weekday) {
+        1 => 'Mon',
+        2 => 'Tue',
+        3 => 'Wed',
+        4 => 'Thu',
+        5 => 'Fri',
+        6 => 'Sat',
+        _ => 'Sun',
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stats = mock.campusStats;
+    final checkInState = ref.watch(checkInProvider);
+    final checkIns = checkInState.records.isNotEmpty ? checkInState.records : mock.checkIns;
     final unread = ref.watch(notificationsProvider).where((n) => n.unread).length;
-    final todaySlots = mock.schedule.where((s) => s.day == 'Mon').toList();
+    final dayOfWeek = _dayName(DateTime.now().weekday);
+    final todaySlots = mock.schedule.where((s) => s.day == dayOfWeek).toList();
     final notices = ref.watch(notificationsProvider).take(3).toList();
     final colors = Theme.of(context).extension<AppColors>()!;
 
+    final presentCount = checkIns.where((c) => c.status == CheckInStatus.onTime || c.status == CheckInStatus.late).length;
+    final attendancePct = checkIns.isNotEmpty ? (presentCount / checkIns.length * 100).round() : 0;
+
     final statCards = switch (role) {
       Role.admin => [
-          StatCard(label: 'Total students', value: '${stats.totalStudents}', hint: 'Across all programmes', icon: Icons.school_outlined, tone: colors.chart1),
-          StatCard(label: 'Total staff', value: '${stats.totalStaff}', hint: 'Faculty & administration', icon: Icons.groups_outlined, tone: colors.chart2),
-          StatCard(label: 'Present today', value: '${stats.presentToday}', hint: '${(stats.presentToday / stats.totalStudents * 100).round()}% attendance', icon: Icons.how_to_reg_rounded, tone: colors.chart3),
-          StatCard(label: 'Biometric devices', value: '${stats.devicesOnline}/${stats.biometricDevices}', hint: 'Devices online', icon: Icons.fingerprint_rounded, tone: colors.chart5),
+          StatCard(label: 'Total students', value: '${mock.students.length}', hint: 'Across all programmes', icon: Icons.school_outlined, tone: colors.chart1),
+          StatCard(label: 'Total staff', value: '${mock.staff.length}', hint: 'Faculty & administration', icon: Icons.groups_outlined, tone: colors.chart2),
+          StatCard(label: 'Present today', value: '$presentCount', hint: '$attendancePct% attendance', icon: Icons.how_to_reg_rounded, tone: colors.chart3),
+          StatCard(label: 'Biometric devices', value: '7/8', hint: 'Devices online', icon: Icons.fingerprint_rounded, tone: colors.chart5),
         ],
       Role.staff => [
           StatCard(label: 'Mentees', value: '12', hint: 'Under my guidance', icon: Icons.person_outline_rounded, tone: colors.chart1),
-          StatCard(label: 'Classes today', value: '${todaySlots.length}', hint: 'Mon routine', icon: Icons.menu_book_outlined, tone: colors.chart2),
-          StatCard(label: 'Present today', value: '${stats.presentToday}', hint: 'Campus-wide', icon: Icons.how_to_reg_rounded, tone: colors.chart3),
+          StatCard(label: 'Classes today', value: '${todaySlots.length}', hint: '$dayOfWeek routine', icon: Icons.menu_book_outlined, tone: colors.chart2),
+          StatCard(label: 'Present today', value: '$presentCount', hint: 'Campus-wide', icon: Icons.how_to_reg_rounded, tone: colors.chart3),
           StatCard(label: 'Unread notices', value: '$unread', hint: 'Notifications', icon: Icons.notifications_outlined, tone: colors.chart5),
         ],
       Role.student => [
-          StatCard(label: 'Attendance', value: '${stats.avgAttendance}%', hint: 'This semester', icon: Icons.percent_rounded, tone: colors.chart2),
-          StatCard(label: 'Classes today', value: '${todaySlots.length}', hint: 'Mon routine', icon: Icons.menu_book_outlined, tone: colors.chart1),
+          StatCard(label: 'Attendance', value: '$attendancePct%', hint: 'This semester', icon: Icons.percent_rounded, tone: colors.chart2),
+          StatCard(label: 'Classes today', value: '${todaySlots.length}', hint: '$dayOfWeek routine', icon: Icons.menu_book_outlined, tone: colors.chart1),
           StatCard(label: 'Check-in', value: '—', hint: 'Not checked in yet', icon: Icons.fingerprint_rounded, tone: colors.chart3),
           StatCard(label: 'Unread notices', value: '$unread', hint: 'Notifications', icon: Icons.notifications_outlined, tone: colors.chart5),
         ],

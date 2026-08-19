@@ -46,7 +46,7 @@ class _ExamsSectionState extends ConsumerState<ExamsSection> {
         _ExamsTab.schedule => 'Exam schedule',
         _ExamsTab.seating => 'My seating',
         _ExamsTab.marks => 'Mark entry',
-        _ExamsTab.results => 'All results',
+        _ExamsTab.results => widget.role == Role.student ? 'Report card' : 'All results',
         _ExamsTab.manage => 'Manage exams',
       };
 

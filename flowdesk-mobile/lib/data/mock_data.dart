@@ -117,11 +117,11 @@ const defaultRolePermissions = <String, List<String>>{
     'assignments', 'fees', 'scholarships', 'helpdesk', 'feedback', 'profile',
   ],
   'staff': [
-    'overview', 'checkin', 'notifications', 'students', 'mentor', 'schedule',
-    'exams', 'assignments', 'helpdesk', 'feedback', 'profile',
+    'overview', 'checkin', 'notifications', 'students', 'mentor', 'chat',
+    'schedule', 'exams', 'assignments', 'helpdesk', 'feedback', 'profile',
   ],
   'admin': [
-    'overview', 'checkin', 'notifications', 'students', 'staff', 'mentor',
+    'overview', 'checkin', 'notifications', 'students', 'staff', 'chat',
     'schedule', 'exams', 'assignments', 'fees', 'scholarships', 'admissions',
     'helpdesk', 'feedback', 'profile', 'roles',
   ],
