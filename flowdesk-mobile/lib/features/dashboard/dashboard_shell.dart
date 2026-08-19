@@ -28,6 +28,7 @@ import 'sections/profile_section.dart';
 import 'sections/roles_section.dart';
 import 'sections/schedule_section.dart';
 import 'sections/scholarships_section.dart';
+import 'sections/chat_section.dart';
 
 class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key});
@@ -200,6 +201,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         return DirectorySection(kind: DirectoryKind.staff, role: role);
       case SectionId.mentor:
         return MentorSection(role: role, mentorId: user.mentorId);
+      case SectionId.chat:
+        return const ChatSection();
       case SectionId.schedule:
         return ScheduleSection(role: role);
       case SectionId.exams:
