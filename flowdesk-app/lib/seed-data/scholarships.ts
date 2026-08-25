@@ -37,7 +37,7 @@ export const SCHOLARSHIPS: Scholarship[] = [
     name: "Need-based Financial Aid",
     provider: "Campus Alumni Fund",
     amount: 30000,
-    eligibility: "Family income below ₹6 LPA",
+    eligibility: "Family income below Rs. 6 LPA",
     seats: 120,
     deadline: "15 Oct 2026",
     description: "Income-assessed support to cover tuition and hostel costs.",

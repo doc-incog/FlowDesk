@@ -59,6 +59,7 @@ export async function GET(request: Request) {
 
   const records = filtered.map((r) => ({
     id: r.id,
+    userId: r.user_id,
     name: r.name,
     role: r.role,
     time: r.time,

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { CheckCircle2, Clock, Fingerprint, Search, Calendar } from "lucide-react"
-import type { CheckInRecord, Role } from "@/lib/seed-data/core"
+import type { CheckInRecord, Role, UserProfile } from "@/lib/seed-data/core"
 import { BiometricScanner } from "@/components/biometric-scanner"
 import { Card, RoleBadge, SectionHeading, StatusBadge } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
 type HistoryRecord = {
   id: string
+  userId?: string
   name: string
   role: string
   date: string
@@ -17,6 +18,8 @@ type HistoryRecord = {
   method: string
   source: string
 }
+
+type PersonOption = { id: string; name: string; role: string }
 
 type HistorySummary = {
   total: number
@@ -56,6 +59,10 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   // Admin role filter
   const [roleFilter, setRoleFilter] = useState<"all" | "student" | "staff">("all")
 
+  // Per-person history (staff: mentees, admin: anyone)
+  const [people, setPeople] = useState<PersonOption[]>([])
+  const [personId, setPersonId] = useState("")
+
   // Fetch daily records when date changes
   useEffect(() => {
     let alive = true
@@ -71,16 +78,44 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     return () => { alive = false }
   }, [selectedDate])
 
+  // Load the people that can be inspected: staff get their mentees,
+  // admins get every student and staff member.
+  useEffect(() => {
+    if (role === "student") return
+    let alive = true
+    fetch("/api/directory")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || d?.error) return
+        const students = (d?.students ?? []) as UserProfile[]
+        let list: PersonOption[] = students.map((s) => ({ id: s.id, name: s.name, role: "student" }))
+        if (role === "staff") {
+          const mentor = (d?.mentors ?? []).find((m: { name: string }) => m.name === userName)
+          list = mentor ? students.filter((s) => s.mentorId === mentor.id).map((s) => ({ id: s.id, name: s.name, role: "student" })) : []
+        } else {
+          const staff = (d?.staff ?? []).map((s: UserProfile) => ({ id: s.id, name: s.name, role: s.role }))
+          list = [...list, ...staff]
+        }
+        setPeople(list.sort((a, b) => a.name.localeCompare(b.name)))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [role, userName])
+
   // Derive checkedIn from records instead of using a separate effect
   const checkedIn = role === "student" && selectedDate === todayStr() && records.length > 0
 
-  const doFetchHistory = () => {
+  const doFetchHistory = (opts?: { userId?: string }) => {
     setHistoryLoading(true)
     setHistoryError(null)
+    const uid = opts?.userId ?? personId
     const params = new URLSearchParams()
     if (historyFrom) params.set("from", historyFrom)
     if (historyTo) params.set("to", historyTo)
-    if (role === "admin" && roleFilter !== "all") params.set("role", roleFilter)
+    if (uid) params.set("userId", uid)
+    else if (role === "admin" && roleFilter !== "all") params.set("role", roleFilter)
 
     fetch(`/api/checkins/history?${params.toString()}`)
       .then((r) => r.json())
@@ -93,6 +128,17 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
       })
       .catch(() => setHistoryError("Failed to load history"))
       .finally(() => setHistoryLoading(false))
+  }
+
+  const selectPerson = (id: string) => {
+    setPersonId(id)
+    if (id) {
+      doFetchHistory({ userId: id })
+    } else {
+      setHistoryRecords([])
+      setHistorySummary(null)
+      setHistoryError(null)
+    }
   }
 
   const handleVerified = async (method: "webauthn" | "biometric") => {
@@ -126,6 +172,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   const absent = records.filter((r) => r.status === "absent").length
   const total = records.length
   const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0
+  const selectedPerson = people.find((p) => p.id === personId)
 
   const inputCls =
     "rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -300,7 +347,19 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               ) : (
                 records.map((r) => (
                   <tr key={r.id}>
-                    <td className="py-2.5 font-medium">{r.name}</td>
+                    <td className="py-2.5 font-medium">
+                      {role !== "student" && r.userId ? (
+                        <button
+                          onClick={() => selectPerson(r.userId!)}
+                          title={`View ${r.name}'s attendance history`}
+                          className="rounded-sm text-left underline-offset-2 transition-colors hover:text-primary hover:underline"
+                        >
+                          {r.name}
+                        </button>
+                      ) : (
+                        r.name
+                      )}
+                    </td>
                     {role !== "student" && (
                       <td className="py-2.5"><RoleBadge role={r.role} /></td>
                     )}
@@ -323,13 +382,46 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
             role === "student"
               ? "Search your past attendance records by date range."
               : role === "staff"
-                ? "Search mentee attendance records by date range."
-                : "Search all attendance records by date range and role."
+                ? "Pick a mentee or a date range to inspect their attendance history."
+                : "Pick any student or staff member, or filter everyone by date range and role."
           }
         />
 
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3">
+          {role !== "student" && (
+            <div className="space-y-1.5">
+              <label htmlFor="hist-person" className="text-xs font-medium text-muted-foreground">Person</label>
+              <select
+                id="hist-person"
+                value={personId}
+                onChange={(e) => selectPerson(e.target.value)}
+                className={cn(inputCls, "min-w-44")}
+              >
+                <option value="">
+                  {role === "staff" ? "All my mentees" : "Everyone"}
+                </option>
+                {role === "admin" ? (
+                  <>
+                    <optgroup label="Students">
+                      {people.filter((p) => p.role === "student").map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Staff">
+                      {people.filter((p) => p.role !== "student").map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  people.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label htmlFor="hist-from" className="text-xs font-medium text-muted-foreground">From</label>
             <input
@@ -350,7 +442,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               className={cn(inputCls, "font-mono")}
             />
           </div>
-          {role === "admin" && (
+          {role === "admin" && !personId && (
             <div className="space-y-1.5">
               <label htmlFor="hist-role" className="text-xs font-medium text-muted-foreground">Role</label>
               <select
@@ -366,7 +458,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
             </div>
           )}
           <button
-            onClick={doFetchHistory}
+            onClick={() => doFetchHistory()}
             disabled={historyLoading}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
           >
@@ -377,7 +469,10 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         {/* History summary */}
         {historySummary && (
           <div className="flex flex-wrap gap-4 rounded-md border border-border bg-secondary/50 px-4 py-3 text-sm">
-            <span className="font-medium">{historySummary.total} total records</span>
+            <span className="font-medium">
+              {historySummary.total} total record{historySummary.total === 1 ? "" : "s"}
+              {selectedPerson ? ` · ${selectedPerson.name}` : ""}
+            </span>
             <span className="text-success">{historySummary.present} present</span>
             <span className="text-chart-5">{historySummary.late} late</span>
             <span className="text-destructive">{historySummary.absent} absent</span>
@@ -396,8 +491,8 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="pb-2 font-medium">Date</th>
-                  {role === "admin" && <th className="pb-2 font-medium">Name</th>}
-                  {role === "admin" && <th className="pb-2 font-medium">Role</th>}
+                  {role !== "student" && <th className="pb-2 font-medium">Name</th>}
+                  {role !== "student" && <th className="pb-2 font-medium">Role</th>}
                   <th className="pb-2 font-medium">Time</th>
                   <th className="pb-2 font-medium">Method</th>
                   <th className="pb-2 text-right font-medium">Status</th>
@@ -407,8 +502,8 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
                 {historyRecords.map((r) => (
                   <tr key={r.id}>
                     <td className="py-2.5 font-mono text-muted-foreground">{r.date}</td>
-                    {role === "admin" && <td className="py-2.5 font-medium">{r.name}</td>}
-                    {role === "admin" && (
+                    {role !== "student" && <td className="py-2.5 font-medium">{r.name}</td>}
+                    {role !== "student" && (
                       <td className="py-2.5"><RoleBadge role={r.role} /></td>
                     )}
                     <td className="py-2.5 font-mono text-muted-foreground">{r.time}</td>

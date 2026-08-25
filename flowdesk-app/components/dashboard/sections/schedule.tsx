@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, MapPin, Plus, User } from "lucide-react"
+import { AlertTriangle, MapPin, Plus, Trash2, User } from "lucide-react"
 import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -70,6 +70,15 @@ export function ScheduleSection({ role }: { role: Role }) {
   const byDay = (d: string) => schedule.filter((s) => s.day === d).sort((a, b) => a.start.localeCompare(b.start))
   const conflicts = findConflicts(schedule)
 
+  const deleteSlot = async (id: string) => {
+    try {
+      const res = await fetch(`/api/schedule/${id}`, { method: "DELETE" })
+      if (res.ok) setSchedule((prev) => prev.filter((s) => s.id !== id))
+    } catch {
+      // Slot stays until the section is reloaded
+    }
+  }
+
   const desc =
     role === "student"
       ? "Your weekly module routine."
@@ -106,7 +115,13 @@ export function ScheduleSection({ role }: { role: Role }) {
                       No classes
                     </div>
                   ) : (
-                    byDay(d).map((s) => <SlotCard key={s.id} slot={s} />)
+                    byDay(d).map((s) => (
+                      <SlotCard
+                        key={s.id}
+                        slot={s}
+                        onDelete={role === "admin" ? () => deleteSlot(s.id) : undefined}
+                      />
+                    ))
                   )}
                 </div>
               </div>
@@ -135,7 +150,13 @@ export function ScheduleSection({ role }: { role: Role }) {
               {byDay(day).length === 0 ? (
                 <Card className="py-8 text-center text-sm text-muted-foreground">No classes scheduled.</Card>
               ) : (
-                byDay(day).map((s) => <SlotCard key={s.id} slot={s} />)
+                byDay(day).map((s) => (
+                  <SlotCard
+                    key={s.id}
+                    slot={s}
+                    onDelete={role === "admin" ? () => deleteSlot(s.id) : undefined}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -149,12 +170,41 @@ export function ScheduleSection({ role }: { role: Role }) {
   )
 }
 
-function SlotCard({ slot }: { slot: ScheduleSlot }) {
+function SlotCard({ slot, onDelete }: { slot: ScheduleSlot; onDelete?: () => void }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   return (
     <div className="rounded-xl border border-border bg-card/70 p-4">
-      <p className="font-mono text-xs font-semibold text-muted-foreground">
-        {slot.start} – {slot.end}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-mono text-xs font-semibold text-muted-foreground">
+          {slot.start} – {slot.end}
+        </p>
+        {onDelete &&
+          (confirmingDelete ? (
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={onDelete}
+                className="rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+              >
+                No
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              aria-label={`Delete ${slot.module} slot`}
+              title="Delete slot"
+              className="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ))}
+      </div>
       <p className="mt-1 font-semibold leading-tight text-balance">{slot.module}</p>
       <p className="font-mono text-xs text-muted-foreground">{slot.code}</p>
       <div className="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -235,6 +285,7 @@ function AddSlotView({
     start: "09:00",
     end: "10:30",
     code: "",
+    module: "",
     room: "",
     staff: staff[0]?.name ?? "",
   })
@@ -243,23 +294,29 @@ function AddSlotView({
   const [saving, setSaving] = useState(false)
 
   const add = async () => {
-    if (!form.code || !form.room) {
-      setError("Module and room are required.")
+    if (!form.code || !form.module || !form.room) {
+      setError("Course code, course name and room are required.")
       return
     }
-    const moduleName = modules.find(([code]) => code === form.code)?.[1] ?? ""
+    if (form.start >= form.end) {
+      setError("The end time must be after the start time.")
+      return
+    }
     const draft: ScheduleSlot = {
       id: `s${Date.now()}`,
       day: form.day,
       start: form.start,
       end: form.end,
-      module: moduleName,
+      module: form.module,
       code: form.code,
       room: form.room,
       staff: form.staff,
     }
     const clashes = schedule.filter(
-      (s) => s.day === form.day && overlaps(s, draft) && (s.room === form.room || s.staff === form.staff),
+      (s) =>
+        s.day === form.day &&
+        overlaps(s, draft) &&
+        (s.room === form.room || (form.staff !== "" && s.staff === form.staff)),
     )
     if (clashes.length > 0) {
       setConflict(
@@ -282,7 +339,7 @@ function AddSlotView({
       }
       if (data?.slot) setSchedule((prev) => [...prev, data.slot])
       setConflict(null)
-      setForm((f) => ({ ...f, code: "", room: "" }))
+      setForm((f) => ({ ...f, code: "", module: "", room: "" }))
     } catch {
       setError("Network error while saving the slot.")
     } finally {
@@ -316,16 +373,41 @@ function AddSlotView({
               <input id="schedule-end" type="time" value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} className={inputCls} />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="schedule-module" className="text-sm font-medium">Module</label>
-            <select id="schedule-module" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className={inputCls}>
-              <option value="">Select…</option>
-              {modules.map(([code, name]) => (
-                <option key={code} value={code}>
-                  {code} · {name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="schedule-code" className="text-sm font-medium">Course code</label>
+              <input
+                id="schedule-code"
+                value={form.code}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="CS301"
+                list="schedule-course-codes"
+                className={inputCls}
+              />
+              <datalist id="schedule-course-codes">
+                {modules.map(([code]) => (
+                  <option key={code} value={code} />
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="schedule-module" className="text-sm font-medium">Course name</label>
+              <input
+                id="schedule-module"
+                value={form.module}
+                onChange={(e) => setForm((f) => ({ ...f, module: e.target.value }))}
+                placeholder="Data Structures"
+                list="schedule-course-names"
+                className={inputCls}
+              />
+              <datalist id="schedule-course-names">
+                {modules.map(([code, name]) => (
+                  <option key={code} value={name}>
+                    {code}
+                  </option>
+                ))}
+              </datalist>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -335,6 +417,7 @@ function AddSlotView({
             <div className="space-y-1.5">
               <label htmlFor="schedule-faculty" className="text-sm font-medium">Faculty</label>
               <select id="schedule-faculty" value={form.staff} onChange={(e) => setForm((f) => ({ ...f, staff: e.target.value }))} className={inputCls}>
+                <option value="">Unassigned</option>
                 {staff.map((s) => (
                   <option key={s.id} value={s.name}>{s.name}</option>
                 ))}

@@ -30,7 +30,7 @@ export async function GET(
     JOIN users u ON u.id = m.sender_id
     WHERE m.conversation_id = ?
   `
-  const args: unknown[] = [id]
+  const args: (string | number)[] = [id]
 
   if (before) {
     query += " AND m.created_at < ?"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Mail, Pencil, Plus, Search } from "lucide-react"
+import { Mail, Pencil, Plus, Search, Trash2 } from "lucide-react"
 import type { Mentor, Role, UserProfile } from "@/lib/seed-data/core"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,9 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
   const [selected, setSelected] = useState<UserProfile | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
 
   const isAdmin = role === "admin"
@@ -73,6 +76,32 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
         (p.rollNo?.toLowerCase().includes(q) ?? false),
     )
   }, [data, query])
+
+  const select = (p: UserProfile | null) => {
+    setSelected(p)
+    setConfirmingDelete(false)
+    setDeleteError(null)
+  }
+
+  const deletePerson = async () => {
+    if (!selected || deleting) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/directory/${selected.id}`, { method: "DELETE" })
+      const d = await res.json()
+      if (!res.ok) {
+        setDeleteError(d?.error ?? "Could not delete this person.")
+        return
+      }
+      select(null)
+      setTick((t) => t + 1)
+    } catch {
+      setDeleteError("Network error while deleting.")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const title = kind === "students" ? "Student directory" : "Staff directory"
   const desc = data
@@ -133,7 +162,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
         <div className="space-y-3 lg:col-span-2">
           {filtered.map((p) => (
             <Card key={p.id}>
-              <button onClick={() => setSelected(p)} className="flex w-full items-center gap-4 text-left">
+              <button onClick={() => select(p)} className="flex w-full items-center gap-4 text-left">
                 <Avatar initials={p.avatarInitials} className="h-11 w-11" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{p.name}</p>
@@ -211,6 +240,41 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                       </button>
                     )}
                   </div>
+                  {isAdmin && !editing && (
+                    confirmingDelete ? (
+                      <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+                        <p className="text-sm">
+                          Delete <b>{selected.name}</b>? This removes their account, attendance and chat
+                          history. Fees already paid and results are kept.
+                        </p>
+                        {deleteError && (
+                          <p role="alert" className="text-sm text-destructive">{deleteError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={deletePerson}
+                            disabled={deleting}
+                            className="flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden /> {deleting ? "Deleting…" : "Yes, delete"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingDelete(false)}
+                            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmingDelete(true)}
+                        className="flex w-full items-center justify-center gap-2 rounded-sm border border-destructive/40 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden /> Delete account
+                      </button>
+                    )
+                  )}
                 </>
               )}
             </div>

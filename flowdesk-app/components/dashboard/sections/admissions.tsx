@@ -164,7 +164,7 @@ export function AdmissionsSection() {
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {a.status === "accepted" && (
                     <span className="pill bg-success/10 text-success">
-                      {program ? `Fee ${program.fee.toLocaleString("en-IN")}/yr` : ""}
+                      {program ? `Fee Rs. ${program.fee.toLocaleString("en-NP")}/yr` : ""}
                     </span>
                   )}
                   {nextAdmissionStatus(a.status) && (

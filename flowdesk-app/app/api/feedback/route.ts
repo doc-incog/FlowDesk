@@ -4,6 +4,16 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
+type FeedbackEntryRow = {
+  id: string
+  target_id: string
+  rating: number
+  comment: string
+  by_id: string | null
+  by_name: string
+  created_at: string
+}
+
 export async function GET() {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -14,13 +24,24 @@ export async function GET() {
     .prepare("SELECT id, type, name, subtitle FROM feedback_targets ORDER BY name")
     .all() as { id: string; type: string; name: string; subtitle: string }[]
 
-  const entries = db
-    .prepare("SELECT id, target_id, rating, comment, by_name, created_at FROM feedback_entries ORDER BY created_at DESC")
-    .all() as { id: string; target_id: string; rating: number; comment: string; by_name: string; created_at: string }[]
+  const rows = db
+    .prepare(
+      "SELECT id, target_id, rating, comment, by_id, by_name, created_at FROM feedback_entries ORDER BY created_at DESC",
+    )
+    .all() as FeedbackEntryRow[]
+
+  // Individual responses (who wrote what) are only visible to admins.
+  // Everyone else gets anonymised entries for aggregate views.
+  const isAdmin = user.role === "admin"
+  const entries = rows.map((e) =>
+    isAdmin
+      ? { id: e.id, targetId: e.target_id, rating: e.rating, comment: e.comment, byName: e.by_name, createdAt: e.created_at }
+      : { id: e.id, targetId: e.target_id, rating: e.rating, createdAt: e.created_at },
+  )
 
   return NextResponse.json({
     targets: targets.map((t) => ({ id: t.id, type: t.type, name: t.name, subtitle: t.subtitle })),
-    entries: entries.map((e) => ({ id: e.id, targetId: e.target_id, rating: e.rating, comment: e.comment, byName: e.by_name, createdAt: e.created_at })),
+    entries,
   })
 }
 
@@ -49,15 +70,18 @@ export async function POST(request: Request) {
   const target = db.prepare("SELECT id FROM feedback_targets WHERE id = ?").get(targetId)
   if (!target) return NextResponse.json({ error: "Feedback target not found" }, { status: 404 })
 
-  // Check for existing feedback from this user on this target
+  // Check for existing feedback from this user on this target. Older rows have
+  // no by_id, so fall back to the stored name.
   const existing = db
-    .prepare("SELECT id FROM feedback_entries WHERE target_id = ? AND by_name = ?")
-    .get(targetId, user.name) as { id: string } | undefined
+    .prepare(
+      "SELECT id FROM feedback_entries WHERE target_id = ? AND (by_id = ? OR (by_id IS NULL AND by_name = ?))",
+    )
+    .get(targetId, user.id, user.name) as { id: string } | undefined
 
   if (existing) {
     // Update existing feedback
-    db.prepare("UPDATE feedback_entries SET rating = ?, comment = ? WHERE id = ?")
-      .run(rating, comment, existing.id)
+    db.prepare("UPDATE feedback_entries SET rating = ?, comment = ?, by_id = ? WHERE id = ?")
+      .run(rating, comment, user.id, existing.id)
     return NextResponse.json({
       entry: { id: existing.id, targetId, rating, comment, byName: user.name, createdAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) },
     })
@@ -67,8 +91,8 @@ export async function POST(request: Request) {
   const createdAt = new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
 
   db.prepare(
-    "INSERT INTO feedback_entries (id, target_id, rating, comment, by_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(id, targetId, rating, comment, user.name, createdAt)
+    "INSERT INTO feedback_entries (id, target_id, rating, comment, by_id, by_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(id, targetId, rating, comment, user.id, user.name, createdAt)
 
   return NextResponse.json({
     entry: { id, targetId, rating, comment, byName: user.name, createdAt },

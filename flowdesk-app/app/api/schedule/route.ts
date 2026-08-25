@@ -67,9 +67,12 @@ export async function POST(request: Request) {
   const clash = db
     .prepare("SELECT module FROM schedule_slots WHERE day = ? AND room = ? AND start < ? AND ? < end")
     .all(day, room, end, start) as { module: string }[]
-  const staffClash = db
-    .prepare("SELECT module FROM schedule_slots WHERE day = ? AND staff = ? AND start < ? AND ? < end")
-    .all(day, staff, end, start) as { module: string }[]
+  // An empty faculty selection must not clash against other unassigned slots.
+  const staffClash = staff
+    ? (db
+        .prepare("SELECT module FROM schedule_slots WHERE day = ? AND staff = ? AND start < ? AND ? < end")
+        .all(day, staff, end, start) as { module: string }[])
+    : []
   const allClashes = [...clash, ...staffClash]
   if (allClashes.length > 0) {
     return NextResponse.json(

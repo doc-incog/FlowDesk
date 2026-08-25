@@ -198,7 +198,7 @@ export function DashboardShell() {
       case "helpdesk":
         return <HelpdeskSection role={user.role} />
       case "feedback":
-        return <FeedbackSection />
+        return <FeedbackSection role={user.role} />
       case "profile":
         return <ProfileSection />
       case "roles":

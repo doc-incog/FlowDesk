@@ -228,7 +228,7 @@ export default function ApplyPage() {
                           {selected && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {p.duration} · {p.seats} seats · {p.fee.toLocaleString("en-IN")}/yr
+                          {p.duration} · {p.seats} seats · Rs. {p.fee.toLocaleString("en-NP")}/yr
                         </p>
                         <p className="mt-0.5 text-xs font-medium text-primary">Deadline {p.deadline}</p>
                       </button>

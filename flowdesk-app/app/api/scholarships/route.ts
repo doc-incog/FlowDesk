@@ -23,11 +23,19 @@ export async function GET() {
     description: string
   }[]
 
-  const appRows = db
-    .prepare(
-      "SELECT id, scholarship_id, student_id, student_name, status, submitted_at, docs FROM scholarship_applications WHERE student_id = ?",
-    )
-    .all(user.id) as {
+  const appRows = (
+    user.role === "admin"
+      ? db
+          .prepare(
+            "SELECT id, scholarship_id, student_id, student_name, status, submitted_at, docs FROM scholarship_applications ORDER BY submitted_at",
+          )
+          .all()
+      : db
+          .prepare(
+            "SELECT id, scholarship_id, student_id, student_name, status, submitted_at, docs FROM scholarship_applications WHERE student_id = ?",
+          )
+          .all(user.id)
+  ) as {
     id: string
     scholarship_id: string
     student_id: string

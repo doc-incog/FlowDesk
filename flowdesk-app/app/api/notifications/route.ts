@@ -11,10 +11,11 @@ export async function GET() {
   const rows = getDb()
     .prepare(
       `SELECT id, title, body, time, category, unread
-       FROM notifications WHERE user_id IS NULL OR user_id = ?
+       FROM notifications
+       WHERE (user_id IS NULL AND (target_role IS NULL OR target_role = ?)) OR user_id = ?
        ORDER BY CASE category WHEN 'alert' THEN 0 WHEN 'academic' THEN 1 WHEN 'event' THEN 2 ELSE 3 END, time`,
     )
-    .all(user.id) as { id: string; title: string; body: string; time: string; category: string; unread: number }[]
+    .all(user.role, user.id) as { id: string; title: string; body: string; time: string; category: string; unread: number }[]
 
   return NextResponse.json({
     notifications: rows.map((n) => ({
@@ -35,12 +36,21 @@ export async function POST(request: Request) {
   const db = getDb()
 
   // Try to parse body — if empty or no JSON, treat as "mark all read"
-  let body: { title?: string; body?: string; category?: string; target?: string } = {}
+  let body: { id?: string; title?: string; body?: string; category?: string; target?: string } = {}
   try {
     body = await request.json()
   } catch {
     // No JSON body — mark all as read (legacy behavior)
     db.prepare("UPDATE notifications SET unread = 0 WHERE user_id IS NULL OR user_id = ?").run(user.id)
+    return NextResponse.json({ ok: true })
+  }
+
+  // Mark a single notification as read
+  if (body.id) {
+    db.prepare("UPDATE notifications SET unread = 0 WHERE id = ? AND (user_id IS NULL OR user_id = ?)").run(
+      body.id,
+      user.id,
+    )
     return NextResponse.json({ ok: true })
   }
 
@@ -65,21 +75,14 @@ export async function POST(request: Request) {
     if (target === "all") {
       // Broadcast to everyone
       db.prepare(
-        "INSERT INTO notifications (id, title, body, time, category, unread, user_id) VALUES (?, ?, ?, ?, ?, 1, NULL)",
+        "INSERT INTO notifications (id, title, body, time, category, unread, user_id, target_role) VALUES (?, ?, ?, ?, ?, 1, NULL, NULL)",
       ).run(id, title, notifBody, time, category)
     } else if (target === "staff" || target === "students") {
-      // Send to specific role
+      // Role-targeted broadcast: one shared row filtered by role on read.
       const roleKey = target === "staff" ? "staff" : "student"
-      const users = db
-        .prepare("SELECT id FROM users WHERE role = ?")
-        .all(roleKey) as { id: string }[]
-
-      const insert = db.prepare(
-        "INSERT INTO notifications (id, title, body, time, category, unread, user_id) VALUES (?, ?, ?, ?, ?, 1, ?)",
-      )
-      for (const u of users) {
-        insert.run(`${id}-${u.id}`, title, notifBody, time, category, u.id)
-      }
+      db.prepare(
+        "INSERT INTO notifications (id, title, body, time, category, unread, user_id, target_role) VALUES (?, ?, ?, ?, ?, 1, NULL, ?)",
+      ).run(id, title, notifBody, time, category, roleKey)
     }
 
     return NextResponse.json({ ok: true, id })
@@ -87,5 +90,23 @@ export async function POST(request: Request) {
 
   // Default: mark all as read
   db.prepare("UPDATE notifications SET unread = 0 WHERE user_id IS NULL OR user_id = ?").run(user.id)
+  return NextResponse.json({ ok: true })
+}
+
+/** Deletes a notification for everyone it targets (admin only). */
+export async function DELETE(request: Request) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+  const url = new URL(request.url)
+  const id = url.searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "Notification id is required" }, { status: 400 })
+
+  const result = getDb().prepare("DELETE FROM notifications WHERE id = ?").run(id)
+  if (result.changes === 0) {
+    return NextResponse.json({ error: "Notification not found" }, { status: 404 })
+  }
+
   return NextResponse.json({ ok: true })
 }

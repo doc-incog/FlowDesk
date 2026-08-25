@@ -63,3 +63,80 @@ export async function GET() {
 
   return NextResponse.json({ assignments, submissions })
 }
+
+/** Creates an assignment visible to every workspace (staff/admin). */
+export async function POST(request: Request) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (user.role !== "admin" && user.role !== "staff") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  let body: {
+    moduleCode?: string
+    moduleName?: string
+    title?: string
+    description?: string
+    assignedDate?: string
+    dueDate?: string
+    maxMarks?: number | string
+  } = {}
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
+  const moduleCode = body.moduleCode?.trim()
+  const moduleName = body.moduleName?.trim()
+  const title = body.title?.trim()
+  const description = body.description?.trim() ?? ""
+  const assignedDate = body.assignedDate?.trim()
+  const dueDate = body.dueDate?.trim()
+  if (!moduleCode || !moduleName || !title || !dueDate) {
+    return NextResponse.json(
+      { error: "Course code, course name, title and due date are required" },
+      { status: 400 },
+    )
+  }
+
+  const maxMarksRaw = Number(body.maxMarks ?? 100)
+  const maxMarks = Number.isFinite(maxMarksRaw) ? Math.floor(maxMarksRaw) : NaN
+  if (!Number.isFinite(maxMarks) || maxMarks < 1 || maxMarks > 1000) {
+    return NextResponse.json({ error: "Max marks must be between 1 and 1000" }, { status: 400 })
+  }
+
+  const db = getDb()
+  const id = `ASG-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`
+  db.prepare(
+    `INSERT INTO assignments (id, module_code, module_name, title, description, assigned_date, due_date, max_marks)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    moduleCode,
+    moduleName,
+    title,
+    description,
+    assignedDate || new Date().toISOString().slice(0, 10),
+    dueDate,
+    maxMarks,
+  )
+
+  return NextResponse.json(
+    {
+      ok: true,
+      assignment: {
+        id,
+        moduleCode,
+        moduleName,
+        title,
+        description,
+        assignedDate: assignedDate || new Date().toISOString().slice(0, 10),
+        dueDate,
+        maxMarks,
+        submission: null,
+      },
+    },
+    { status: 201 },
+  )
+}

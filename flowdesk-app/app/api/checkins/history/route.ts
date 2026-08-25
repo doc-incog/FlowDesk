@@ -5,6 +5,8 @@ import { localDate } from "@/lib/datetime"
 
 export const runtime = "nodejs"
 
+const EMPTY_SUMMARY = { total: 0, present: 0, late: 0, absent: 0, percentage: 0 }
+
 export async function GET(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -13,6 +15,7 @@ export async function GET(request: Request) {
   const from = searchParams.get("from")
   const to = searchParams.get("to")
   const roleFilter = searchParams.get("role") // optional: "student" | "staff"
+  const personId = searchParams.get("userId") // optional: per-person history
 
   const db = getDb()
 
@@ -20,39 +23,53 @@ export async function GET(request: Request) {
   const conditions: string[] = []
   const params: (string | number)[] = []
 
-  // Role-based filtering
+  // Staff can only see their own mentees. Resolve them up front so the same
+  // set also authorises per-person lookups.
+  let menteeIds: string[] | null = null
   if (user.role === "student") {
     // Students only see their own records
     conditions.push("user_id = ?")
     params.push(user.id)
   } else if (user.role === "staff") {
-    // Staff see only mentees' records
     // Find the mentor record matching this staff member's name
     const mentorRow = db
       .prepare("SELECT id FROM mentors WHERE name = ?")
       .get(user.name) as { id: string } | undefined
 
-    if (mentorRow) {
-      const menteeRows = db
-        .prepare("SELECT id FROM users WHERE mentor_id = ?")
-        .all(mentorRow.id) as { id: string }[]
+    menteeIds = mentorRow
+      ? (db.prepare("SELECT id FROM users WHERE mentor_id = ?").all(mentorRow.id) as { id: string }[]).map(
+          (r) => r.id,
+        )
+      : []
 
-      if (menteeRows.length === 0) {
-        return NextResponse.json({ date: localDate(), records: [], summary: { total: 0, present: 0, late: 0, absent: 0, percentage: 0 } })
-      }
-
-      const placeholders = menteeRows.map(() => "?").join(",")
-      conditions.push(`user_id IN (${placeholders})`)
-      params.push(...menteeRows.map((r) => r.id))
-    } else {
-      // Staff member has no mentor record — return empty
-      return NextResponse.json({ date: localDate(), records: [], summary: { total: 0, present: 0, late: 0, absent: 0, percentage: 0 } })
+    if (menteeIds.length === 0) {
+      return NextResponse.json({ date: localDate(), records: [], summary: EMPTY_SUMMARY })
     }
   }
-  // Admin sees all records (no user_id filter)
+  // Admin sees all records unless a specific person is requested
 
-  // Optional role filter (admin only)
-  if (roleFilter && user.role === "admin" && (roleFilter === "student" || roleFilter === "staff")) {
+  // Per-person history: admins may query anyone, staff only their mentees.
+  if (personId) {
+    if (user.role === "admin") {
+      const target = db.prepare("SELECT id FROM users WHERE id = ?").get(personId)
+      if (!target) return NextResponse.json({ error: "Person not found" }, { status: 404 })
+    } else if (user.role === "staff") {
+      if (!menteeIds!.includes(personId)) {
+        return NextResponse.json({ error: "You can only view your mentees' attendance" }, { status: 403 })
+      }
+    } else {
+      // Students are always scoped to themselves below
+    }
+    conditions.push("user_id = ?")
+    params.push(personId)
+  } else if (menteeIds) {
+    const placeholders = menteeIds.map(() => "?").join(",")
+    conditions.push(`user_id IN (${placeholders})`)
+    params.push(...menteeIds)
+  }
+
+  // Optional role filter (admin only, ignored when a specific person is chosen)
+  if (!personId && roleFilter && user.role === "admin" && (roleFilter === "student" || roleFilter === "staff")) {
     conditions.push("role = ?")
     params.push(roleFilter)
   }
@@ -92,6 +109,7 @@ export async function GET(request: Request) {
 
   const records = rows.map((r) => ({
     id: r.id,
+    userId: r.user_id,
     name: r.name,
     role: r.role,
     date: r.created_at.substring(0, 10),

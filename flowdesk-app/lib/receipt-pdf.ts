@@ -11,8 +11,8 @@ export type ReceiptPdfData = {
   transactionId: string
 }
 
-export function formatINR(n: number): string {
-  return `\u20B9${n.toLocaleString("en-IN")}`
+export function formatNPR(n: number): string {
+  return `Rs. ${n.toLocaleString("en-NP")}`
 }
 
 export function buildReceiptPdf(data: ReceiptPdfData): Promise<Buffer> {
@@ -72,7 +72,7 @@ export function buildReceiptPdf(data: ReceiptPdfData): Promise<Buffer> {
     doc.moveDown(1.4)
     const itemY = doc.y
     doc.font("Helvetica").fontSize(11).fillColor("#1c1c2e").text(data.itemName, left, itemY)
-    doc.font("Helvetica-Bold").fontSize(11).text(formatINR(data.amount), right - 90, itemY)
+    doc.font("Helvetica-Bold").fontSize(11).text(formatNPR(data.amount), right - 90, itemY)
     doc.moveDown(1.6)
     doc
       .moveTo(left, doc.y)
@@ -82,7 +82,7 @@ export function buildReceiptPdf(data: ReceiptPdfData): Promise<Buffer> {
     doc.moveDown(0.4)
     const totalY = doc.y
     doc.font("Helvetica").fontSize(10).fillColor("#1c1c2e").text(`Total paid via ${data.method}`, left, totalY)
-    doc.font("Helvetica-Bold").text(formatINR(data.amount), right - 90, totalY)
+    doc.font("Helvetica-Bold").text(formatNPR(data.amount), right - 90, totalY)
 
     doc.moveDown(2.4)
     doc

@@ -34,7 +34,7 @@ export async function PATCH(
   }
 
   const updates: string[] = []
-  const values: unknown[] = []
+  const values: (string | number)[] = []
 
   if (body.status && ["open", "in-progress", "resolved"].includes(body.status)) {
     updates.push("status = ?")

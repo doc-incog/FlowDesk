@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { BookOpen, CalendarHeart, TriangleAlert, Cog, Check, Send } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { BookOpen, CalendarHeart, TriangleAlert, Cog, Check, Send, Trash2 } from "lucide-react"
 import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,21 @@ export function NotificationsSection({ role }: { role: Role }) {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendSuccess, setSendSuccess] = useState(false)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/notifications")
+      const d = await r.json()
+      if (d?.error) setError(d.error)
+      else {
+        setItems(d.notifications ?? [])
+        setError(null)
+      }
+    } catch {
+      // Keep showing the last loaded list until the next poll
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -43,12 +58,20 @@ export function NotificationsSection({ role }: { role: Role }) {
         if (d?.error) setError(d.error)
         else setItems(d.notifications ?? [])
       })
-      .catch(() => alive && setError("Failed to load"))
-      .finally(() => alive && setLoading(false))
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
     return () => {
       alive = false
     }
   }, [])
+
+  // Real-time-ish: poll for new notifications while the section is open.
+  useEffect(() => {
+    const timer = setInterval(load, 5000)
+    return () => clearInterval(timer)
+  }, [load])
 
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
@@ -61,8 +84,24 @@ export function NotificationsSection({ role }: { role: Role }) {
     setItems((prev) => (prev ?? []).map((n) => ({ ...n, unread: false })))
     fetch("/api/notifications", { method: "POST" }).catch(() => {})
   }
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
     setItems((prev) => (prev ?? []).map((n) => (n.id === id ? { ...n, unread: false } : n)))
+    fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {})
+  }
+
+  const deleteNotification = async (id: string) => {
+    setConfirmingDeleteId(null)
+    try {
+      const res = await fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      if (res.ok) setItems((prev) => (prev ?? []).filter((n) => n.id !== id))
+    } catch {
+      // List refreshes on the next poll
+    }
+  }
 
   const sendNotification = async () => {
     if (!composeTitle.trim()) return
@@ -87,6 +126,7 @@ export function NotificationsSection({ role }: { role: Role }) {
         setSendSuccess(true)
         setComposeTitle("")
         setComposeBody("")
+        load()
         setTimeout(() => {
           setComposing(false)
           setSendSuccess(false)
@@ -238,6 +278,32 @@ export function NotificationsSection({ role }: { role: Role }) {
                 <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{n.body}</p>
                 <p className="mt-2 font-mono text-xs text-muted-foreground">{n.time}</p>
               </div>
+              {role === "admin" &&
+                (confirmingDeleteId === n.id ? (
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => deleteNotification(n.id)}
+                      className="rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDeleteId(null)}
+                      className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                    >
+                      No
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingDeleteId(n.id)}
+                    className="shrink-0 rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Delete ${n.title}`}
+                    title="Delete for everyone"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </button>
+                ))}
               {n.unread && (
                 <button
                   onClick={() => toggle(n.id)}

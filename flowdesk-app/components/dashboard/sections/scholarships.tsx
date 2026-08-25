@@ -69,8 +69,10 @@ export function ScholarshipsSection({ role }: { role: Role }) {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("browse")
   const [applyTarget, setApplyTarget] = useState<Scholarship | null>(null)
-  const [docNames, setDocNames] = useState<string[]>([])
+  const [docFiles, setDocFiles] = useState<File[]>([])
   const [applied, setApplied] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [applyError, setApplyError] = useState("")
   const isStudent = role === "student"
 
   useEffect(() => {
@@ -105,25 +107,37 @@ export function ScholarshipsSection({ role }: { role: Role }) {
 
   const openApply = (s: Scholarship) => {
     setApplyTarget(s)
-    setDocNames([])
+    setDocFiles([])
     setApplied(false)
+    setApplyError("")
   }
 
-  const submitApplication = () => {
-    if (!applyTarget) return
-    setApplications((prev) => [
-      {
-        id: `SA-${Date.now()}`,
-        scholarshipId: applyTarget.id,
-        studentId: me.id,
-        studentName: me.name,
-        status: "submitted",
-        submittedAt: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-        docs: docNames.filter(Boolean),
-      },
-      ...prev,
-    ])
-    setApplied(true)
+  const submitApplication = async () => {
+    if (!applyTarget || submitting) return
+    setSubmitting(true)
+    setApplyError("")
+    try {
+      const form = new FormData()
+      form.append("scholarshipId", applyTarget.id)
+      for (const f of docFiles) form.append("docs", f)
+      const res = await fetch("/api/scholarships/applications", { method: "POST", body: form })
+      const d = await res.json()
+      if (!res.ok) {
+        setApplyError(d?.error ?? "Could not submit the application.")
+        return
+      }
+      if (d?.application) {
+        setApplications((prev) => [
+          { ...d.application, docs: normalizeDocs(d.application.docs) },
+          ...prev,
+        ])
+      }
+      setApplied(true)
+    } catch {
+      setApplyError("Network error while submitting the application.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (role === "admin") {
@@ -166,20 +180,46 @@ export function ScholarshipsSection({ role }: { role: Role }) {
           <div className="space-y-4">
             <div className="rounded-md border border-border bg-secondary/60 px-4 py-3 text-sm">
               <dl className="space-y-1">
-                <div className="flex justify-between"><dt className="text-muted-foreground">Amount</dt><dd className="font-mono font-bold">{applyTarget.amount.toLocaleString("en-IN")}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Amount</dt><dd className="font-mono font-bold">Rs. {applyTarget.amount.toLocaleString("en-NP")}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted-foreground">Eligibility</dt><dd>{applyTarget.eligibility}</dd></div>
                 <div className="flex justify-between"><dt className="text-muted-foreground">Deadline</dt><dd>{applyTarget.deadline}</dd></div>
               </dl>
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Supporting documents</label>
-              <MockFileUpload label="Attach transcript, certificate or income proof" onSelect={(file) => file && setDocNames((d) => [...d, file.name])} />
+              <MockFileUpload
+                label="Attach transcript, certificate or income proof"
+                onSelect={(file) => file && setDocFiles((d) => [...d, file])}
+              />
+              {docFiles.length > 0 && (
+                <ul className="space-y-1">
+                  {docFiles.map((f, i) => (
+                    <li
+                      key={`${f.name}-${i}`}
+                      className="flex items-center gap-2 rounded-sm border border-border bg-secondary/50 px-3 py-1.5 text-sm"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-mono text-xs">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setDocFiles((d) => d.filter((_, idx) => idx !== i))}
+                        aria-label={`Remove ${f.name}`}
+                        className="text-muted-foreground transition-colors hover:text-destructive"
+                      >
+                        <XCircle className="h-4 w-4" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-muted-foreground">Up to 4 documents, 5 MB each.</p>
             </div>
+            {applyError && <p role="alert" className="text-sm text-destructive">{applyError}</p>}
             <button
               onClick={submitApplication}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              disabled={submitting}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              <Plus className="h-4 w-4" aria-hidden /> Submit application
+              <Plus className="h-4 w-4" aria-hidden /> {submitting ? "Submitting…" : "Submit application"}
             </button>
             <p className="text-center text-xs text-muted-foreground">
               Review typically completes within 2 weeks. Track status in &quot;My applications&quot;.
@@ -217,7 +257,7 @@ function ScholarshipCard({ s, canApply, onApply }: { s: Scholarship; canApply: b
       <p className="text-xs text-muted-foreground">{s.provider}</p>
       <div className="my-3 border-t border-border" />
       <dl className="space-y-1 text-sm">
-        <div className="flex justify-between"><dt className="text-muted-foreground">Amount</dt><dd className="font-mono font-bold text-primary">₹{s.amount.toLocaleString("en-IN")}</dd></div>
+        <div className="flex justify-between"><dt className="text-muted-foreground">Amount</dt><dd className="font-mono font-bold text-primary">Rs. {s.amount.toLocaleString("en-NP")}</dd></div>
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Eligibility</dt><dd className="text-right">{s.eligibility}</dd></div>
         <div className="flex justify-between"><dt className="text-muted-foreground">Seats</dt><dd>{s.seats}</dd></div>
         <div className="flex justify-between"><dt className="text-muted-foreground">Deadline</dt><dd className="font-medium">{s.deadline}</dd></div>
@@ -292,8 +332,20 @@ function AdminScholarships({
     pending: applications.filter((a) => a.status === "submitted" || a.status === "under-review").length,
   }
 
-  const setStatus = (id: string, status: ScholarshipStatus) =>
-    setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
+  const setStatus = async (id: string, status: ScholarshipStatus) => {
+    try {
+      const res = await fetch(`/api/scholarships/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) {
+        setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
+      }
+    } catch {
+      // Status refreshes on next visit
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -336,7 +388,7 @@ function AdminScholarships({
                   </span>
                 </div>
                 <p className="font-mono text-xs text-muted-foreground">
-                  {a.id} · {s?.name ?? a.scholarshipId} · {s ? `₹${s.amount.toLocaleString("en-IN")}` : ""}
+                  {a.id} · {s?.name ?? a.scholarshipId} · {s ? `Rs. ${s.amount.toLocaleString("en-NP")}` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">Submitted {a.submittedAt} · {a.docs.join(", ")}</p>
               </div>

@@ -7,7 +7,7 @@ export const CHAT_FAQ: ChatFaq[] = [
   {
     keywords: ["fee", "pay", "payment", "receipt", "tuition"],
     answer:
-      "Semester fees can be paid online from the Fees section (UPI, card, net banking). A digital receipt is generated instantly and can be downloaded from the same section. Tuition for this semester is ₹85,000 and is due 10 Aug 2026.",
+      "Semester fees can be paid online from the Fees section (e-wallet, card, net banking). A digital receipt is generated instantly and can be downloaded from the same section. Tuition for this semester is Rs. 85,000 and is due 10 Aug 2026.",
   },
   {
     keywords: ["exam", "result", "mark", "grade", "report card", "seat"],
