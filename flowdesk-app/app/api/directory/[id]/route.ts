@@ -86,3 +86,57 @@ export async function PATCH(
   const row = findUserById(id)
   return NextResponse.json({ ok: true, person: row ? mapUser(row) : null })
 }
+
+/** Permanently removes a student or staff member and their live data (admin only). */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+  const { id } = await params
+  if (id === user.id) {
+    return NextResponse.json({ error: "You cannot delete your own account" }, { status: 400 })
+  }
+
+  const db = getDb()
+  const existing = findUserById(id)
+  if (!existing) return NextResponse.json({ error: "Person not found" }, { status: 404 })
+  if (existing.role === "admin") {
+    return NextResponse.json({ error: "Admin accounts cannot be deleted" }, { status: 403 })
+  }
+
+  // Chat data: direct conversations involving the deleted person are removed
+  // for everyone (otherwise they linger as "Unknown user" entries); group
+  // chats keep running without them.
+  db.prepare("DELETE FROM messages WHERE sender_id = ?").run(id)
+  db.prepare(
+    `DELETE FROM messages WHERE conversation_id IN (
+      SELECT c.id FROM conversations c
+      JOIN conversation_participants cp ON cp.conversation_id = c.id
+      WHERE cp.user_id = ? AND c.type = 'direct'
+    )`,
+  ).run(id)
+  db.prepare(
+    `DELETE FROM conversations WHERE id IN (
+      SELECT c.id FROM conversations c
+      JOIN conversation_participants cp ON cp.conversation_id = c.id
+      WHERE cp.user_id = ? AND c.type = 'direct'
+    )`,
+  ).run(id)
+  db.prepare("DELETE FROM conversation_participants WHERE user_id = ?").run(id)
+
+  // Live account data: sessions, attendance, notifications and per-user
+  // permission overrides. Historical records (fees paid, results,
+  // submissions) are intentionally preserved for audit.
+  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(id)
+  db.prepare("DELETE FROM check_ins WHERE user_id = ?").run(id)
+  db.prepare("DELETE FROM notifications WHERE user_id = ?").run(id)
+  db.prepare("DELETE FROM user_permissions WHERE user_id = ?").run(id)
+
+  db.prepare("DELETE FROM users WHERE id = ?").run(id)
+
+  return NextResponse.json({ ok: true })
+}

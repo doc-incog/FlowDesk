@@ -39,6 +39,7 @@ export function getDb(): DatabaseSync {
     mkdirSync(DATA_DIR, { recursive: true })
     const db = new DatabaseSync(DB_PATH)
     db.exec("PRAGMA journal_mode = WAL;")
+    db.exec("PRAGMA foreign_keys = ON;")
     createSchema(db)
     migrateDatabase(db)
     seedDatabase(db)
@@ -83,7 +84,6 @@ export function migrateDatabase(db: DatabaseSync) {
     } finally {
       db.exec("PRAGMA foreign_keys = ON")
     }
-    return
   }
 
   const addColumn = (ddl: string) => {
@@ -99,6 +99,61 @@ export function migrateDatabase(db: DatabaseSync) {
   addColumn("guardian_phone TEXT")
   addColumn("emergency_contact TEXT")
   addColumn("dob TEXT")
+
+  // feedback_targets: drop the old CHECK (type IN ('teacher','event')) so
+  // admins can create forms with any category.
+  const targetRow = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'feedback_targets'")
+    .get() as { sql: string } | undefined
+  if (targetRow && /CHECK\s*\(\s*type\s+IN\s*\(/i.test(targetRow.sql)) {
+    db.exec(`
+      CREATE TABLE feedback_targets_new (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        subtitle TEXT NOT NULL
+      );
+      INSERT INTO feedback_targets_new (id, type, name, subtitle)
+        SELECT id, type, name, subtitle FROM feedback_targets;
+      DROP TABLE feedback_targets;
+      ALTER TABLE feedback_targets_new RENAME TO feedback_targets;
+    `)
+  }
+
+  // feedback_entries: attribute entries to a user id (older rows keep NULL and
+  // fall back to by_name matching).
+  try {
+    db.exec("ALTER TABLE feedback_entries ADD COLUMN by_id TEXT")
+  } catch {
+    // column already exists
+  }
+
+  // notifications: role-targeted broadcasts share one row (target_role) so an
+  // admin can delete them for the whole group in one action.
+  try {
+    db.exec("ALTER TABLE notifications ADD COLUMN target_role TEXT")
+  } catch {
+    // column already exists
+  }
+
+  // Data fix: the scholarship section now displays NPR ("Rs.") instead of INR
+  // ("₹"). Seeding is insert-once, so patch seeded rows that still use ₹.
+  try {
+    db.prepare(
+      "UPDATE scholarships SET eligibility = REPLACE(eligibility, '₹', 'Rs. ') WHERE eligibility LIKE '%₹%'",
+    ).run()
+  } catch {
+    // scholarships table may not exist on very old databases
+  }
+
+  // Same data fix for seeded chat messages (FAQ answers mention tuition fees).
+  try {
+    db.prepare(
+      "UPDATE messages SET content = REPLACE(content, '₹', 'Rs. ') WHERE content LIKE '%₹%'",
+    ).run()
+  } catch {
+    // messages table may not exist on very old databases
+  }
 }
 
 export function closeDb() {

@@ -46,8 +46,8 @@ type Receipt = {
   transactionId: string
 }
 
-function formatINR(n: number): string {
-  return `₹${n.toLocaleString("en-IN")}`
+function formatNPR(n: number): string {
+  return `Rs. ${n.toLocaleString("en-NP")}`
 }
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
@@ -173,8 +173,8 @@ export function FeesSection() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total due" value={formatINR(totalDue)} icon={<Banknote className="h-5 w-5" />} tone="warning" />
-        <StatCard label="Paid this semester" value={formatINR(totalPaid)} icon={<BadgeCheck className="h-5 w-5" />} tone="success" />
+        <StatCard label="Total due" value={formatNPR(totalDue)} icon={<Banknote className="h-5 w-5" />} tone="warning" />
+        <StatCard label="Paid this semester" value={formatNPR(totalPaid)} icon={<BadgeCheck className="h-5 w-5" />} tone="success" />
         <StatCard label="Pending items" value={pending.length} icon={<ReceiptIcon className="h-5 w-5" />} tone="primary" />
       </div>
 
@@ -201,7 +201,7 @@ export function FeesSection() {
                 fees.map((f) => (
                   <tr key={f.id}>
                     <td className="py-3 font-medium">{f.name}</td>
-                    <td className="py-3 text-right font-mono font-semibold">{formatINR(f.amount)}</td>
+                    <td className="py-3 text-right font-mono font-semibold">{formatNPR(f.amount)}</td>
                     <td className="py-3 text-muted-foreground">{f.dueDate}</td>
                     <td className="py-3">
                       {f.status === "paid" ? (
@@ -246,7 +246,7 @@ export function FeesSection() {
             <div className="flex items-center justify-between rounded-md border border-border bg-secondary/60 px-4 py-3">
               <div>
                 <p className="text-sm text-muted-foreground">Amount to pay</p>
-                <p className="font-mono text-2xl font-bold text-primary">{formatINR(paying.amount)}</p>
+                <p className="font-mono text-2xl font-bold text-primary">{formatNPR(paying.amount)}</p>
               </div>
               <Lock className="h-5 w-5 text-muted-foreground" aria-hidden />
             </div>
@@ -285,7 +285,7 @@ export function FeesSection() {
               onClick={confirm}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              <Lock className="h-4 w-4" aria-hidden /> Pay {formatINR(paying.amount)} securely
+              <Lock className="h-4 w-4" aria-hidden /> Pay {formatNPR(paying.amount)} securely
             </button>
           </div>
         )}
@@ -311,7 +311,7 @@ export function FeesSection() {
               </span>
               <div>
                 <p className="font-bold">Payment received</p>
-                <p className="text-sm text-muted-foreground">{formatINR(newReceipt.amount)} · {METHOD_LABEL[newReceipt.method]}</p>
+                <p className="text-sm text-muted-foreground">{formatNPR(newReceipt.amount)} · {METHOD_LABEL[newReceipt.method]}</p>
               </div>
             </div>
             <div className="rounded-md border border-border bg-secondary/40 px-4 py-3 text-sm">
@@ -352,7 +352,7 @@ function ReceiptsList({ receipts }: { receipts: Receipt[] }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-lg font-bold">{formatINR(r.amount)}</span>
+            <span className="font-mono text-lg font-bold">{formatNPR(r.amount)}</span>
             <span className="pill bg-secondary text-muted-foreground">
               {METHOD_LABEL[r.method]}
             </span>

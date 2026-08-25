@@ -75,6 +75,7 @@ const tabsFor = (role: Role): TabItem[] => {
       { id: "schedule", label: "Exam schedule" },
       { id: "entry", label: "Mark entry" },
       { id: "results", label: "All results" },
+      { id: "manage", label: "Manage exams" },
     ]
   }
   return [
@@ -94,6 +95,7 @@ export function ExamsSection({ role }: { role: Role }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<string>("schedule")
+  const seesAllResults = role === "staff" || role === "admin"
 
   useEffect(() => {
     let alive = true
@@ -111,13 +113,28 @@ export function ExamsSection({ role }: { role: Role }) {
           const examsList = e.exams ?? []
           setExams(examsList)
           const myId = m?.user?.id ?? ""
-          setResults(
-            examsList.flatMap((ex: Exam) =>
-              ex.result
-                ? [{ id: `${ex.id}-${myId}`, examId: ex.id, studentId: myId, marks: ex.result.marks, maxMarks: ex.result.maxMarks }]
-                : [],
-            ),
-          )
+          if (seesAllResults && Array.isArray(e.results)) {
+            // Staff/admin receive every student's marks for the entry grid.
+            setResults(
+              e.results.map(
+                (r: { examId: string; studentId: string; marks: number; maxMarks: number }) => ({
+                  id: `${r.examId}-${r.studentId}`,
+                  examId: r.examId,
+                  studentId: r.studentId,
+                  marks: r.marks,
+                  maxMarks: r.maxMarks,
+                }),
+              ),
+            )
+          } else {
+            setResults(
+              examsList.flatMap((ex: Exam) =>
+                ex.result
+                  ? [{ id: `${ex.id}-${myId}`, examId: ex.id, studentId: myId, marks: ex.result.marks, maxMarks: ex.result.maxMarks }]
+                  : [],
+              ),
+            )
+          }
         }
         if (d?.students) setStudents(d.students)
         if (s?.schedule) {
@@ -133,7 +150,7 @@ export function ExamsSection({ role }: { role: Role }) {
     return () => {
       alive = false
     }
-  }, [])
+  }, [seesAllResults])
 
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
@@ -155,7 +172,7 @@ export function ExamsSection({ role }: { role: Role }) {
       {tab === "entry" && <MarkEntry exams={exams} results={results} setResults={setResults} students={students} />}
       {tab === "results" && role === "student" && <ReportCardView student={me} exams={exams} results={results} />}
       {tab === "results" && role !== "student" && <AllResults exams={exams} results={results} students={students} />}
-      {tab === "manage" && role === "admin" && <ManageExams exams={exams} setExams={setExamsSafe} modules={modules} />}
+      {tab === "manage" && role !== "student" && <ManageExams exams={exams} setExams={setExamsSafe} modules={modules} />}
     </div>
   )
 }
@@ -438,32 +455,65 @@ function MarkEntry({
   students: UserProfile[]
 }) {
   const [examId, setExamId] = useState(exams[0]?.id ?? "")
-  const [marks, setMarks] = useState<Record<string, number>>({})
+  const [marks, setMarks] = useState<Record<string, number | "">>({})
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
   const exam = exams.find((e) => e.id === examId)
+
+  // Marks already saved for this exam pre-fill the grid; `marks` holds only
+  // unsaved local edits on top of them.
+  const savedForExam: Record<string, number> = {}
+  for (const r of results) if (r.examId === examId) savedForExam[r.studentId] = r.marks
+  const valueFor = (studentId: string): number | "" =>
+    studentId in marks ? marks[studentId] : savedForExam[studentId] ?? ""
 
   const selectExam = (id: string) => {
     setExamId(id)
-    const map: Record<string, number> = {}
-    for (const r of results) if (r.examId === id) map[r.studentId] = r.marks
-    setMarks(map)
+    setMarks({})
     setSaved(false)
+    setError("")
   }
 
-  const save = () => {
-    if (!exam) return
-    setResults((prev) => {
-      const others = prev.filter((r) => r.examId !== examId)
-      const rows: ResultRow[] = students.map((s) => ({
-        id: `${examId}-${s.id}`,
-        examId,
-        studentId: s.id,
-        marks: marks[s.id] ?? 0,
-        maxMarks: exam.maxMarks,
-      }))
-      return [...others, ...rows]
-    })
-    setSaved(true)
+  const save = async () => {
+    if (!exam || saving) return
+    setSaving(true)
+    setError("")
+    try {
+      const payloadRows = students
+        .map((s) => ({ studentId: s.id, value: valueFor(s.id) }))
+        .filter(({ value }) => value !== "")
+      const responses = await Promise.all(
+        payloadRows.map(({ studentId, value }) =>
+          fetch("/api/exams/results", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ examId, studentId, marks: value }),
+          }).then((r) => r.json()),
+        ),
+      )
+      const failed = responses.find((d) => d?.error)
+      if (failed) {
+        setError(failed.error)
+        return
+      }
+      setResults((prev) => {
+        const others = prev.filter((r) => r.examId !== examId)
+        const rows = students.flatMap((s) => {
+          const savedRow = responses.find((d) => d?.result?.studentId === s.id)?.result
+          return savedRow
+            ? [{ id: `${examId}-${s.id}`, examId, studentId: s.id, marks: savedRow.marks, maxMarks: savedRow.maxMarks }]
+            : []
+        })
+        return [...others, ...rows]
+      })
+      setMarks({})
+      setSaved(true)
+    } catch {
+      setError("Network error while saving marks.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -497,8 +547,9 @@ function MarkEntry({
           </thead>
           <tbody className="divide-y divide-border">
             {students.map((s) => {
-              const m = marks[s.id] ?? 0
-              const pct = exam ? percentage(m, exam.maxMarks) : 0
+              const m = valueFor(s.id)
+              const numeric = m === "" ? 0 : Number(m)
+              const pct = exam ? percentage(numeric, exam.maxMarks) : 0
               return (
                 <tr key={s.id}>
                   <td className="py-2.5 font-medium">{s.name}</td>
@@ -508,8 +559,13 @@ function MarkEntry({
                       type="number"
                       min={0}
                       max={exam?.maxMarks ?? 0}
-                      value={marks[s.id] ?? ""}
-                      onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: Number(e.target.value) }))}
+                      value={m}
+                      onChange={(e) =>
+                        setMarks((prev) => ({
+                          ...prev,
+                          [s.id]: e.target.value === "" ? "" : Number(e.target.value),
+                        }))
+                      }
                       aria-label={`Marks for ${s.name}`}
                       className="w-24 rounded-sm border border-input bg-card px-2 py-1.5 text-right font-mono text-sm outline-none focus:border-primary"
                     />
@@ -524,14 +580,16 @@ function MarkEntry({
         </table>
       </Card>
 
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          <Check className="h-4 w-4" aria-hidden /> Save marks
+          <Check className="h-4 w-4" aria-hidden /> {saving ? "Saving…" : "Save marks"}
         </button>
-        {saved && <span role="status" className="text-sm font-medium text-success">Marks saved — grades updated on report cards.</span>}
+        {saved && !error && <span role="status" className="text-sm font-medium text-success">Marks saved — grades updated on report cards.</span>}
       </div>
     </div>
   )
@@ -557,29 +615,45 @@ function ManageExams({
     maxMarks: 50,
   })
   const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  const add = () => {
-    if (!form.moduleName || !form.date || !form.room) {
-      setError("Module, date and room are required.")
+  const add = async () => {
+    if (!form.moduleCode || !form.moduleName || !form.date || !form.room) {
+      setError("Course code, course name, date and room are required.")
       return
     }
-    setExams((prev) => [
-      ...prev,
-      {
-        id: `E${Date.now()}`,
-        title: `${TYPE_LABEL[form.type]} Examination`,
-        moduleCode: form.moduleCode,
-        moduleName: form.moduleName,
-        type: form.type,
-        date: form.date,
-        start: form.start,
-        end: form.end,
-        room: form.room,
-        maxMarks: Number(form.maxMarks) || 50,
-      },
-    ])
-    setForm((f) => ({ ...f, moduleCode: "", moduleName: "", date: "", room: "" }))
+    setSaving(true)
     setError("")
+    try {
+      const res = await fetch("/api/exams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          title: `${TYPE_LABEL[form.type]} Examination`,
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setError(d?.error ?? "Could not create the exam.")
+        return
+      }
+      if (d?.exam) setExams((prev) => [...prev, d.exam])
+      setForm((f) => ({ ...f, moduleCode: "", moduleName: "", date: "", room: "" }))
+    } catch {
+      setError("Network error while creating the exam.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (id: string) => {
+    try {
+      const res = await fetch(`/api/exams/${id}`, { method: "DELETE" })
+      if (res.ok) setExams((prev) => prev.filter((e) => e.id !== id))
+    } catch {
+      // List refreshes on next visit
+    }
   }
 
   const inputCls =
@@ -590,29 +664,40 @@ function ManageExams({
       <Card>
         <SectionHeading title="Schedule a new exam" />
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label htmlFor="exam-module" className="text-sm font-medium">Module</label>
-              <select
-                id="exam-module"
+              <label htmlFor="exam-code" className="text-sm font-medium">Course code</label>
+              <input
+                id="exam-code"
                 value={form.moduleCode}
-                onChange={(e) => {
-                  const m = modules.find(([code]) => code === e.target.value)
-                  setForm((f) => ({
-                    ...f,
-                    moduleCode: e.target.value,
-                    moduleName: m ? m[1] : "",
-                  }))
-                }}
+                onChange={(e) => setForm((f) => ({ ...f, moduleCode: e.target.value.toUpperCase() }))}
+                placeholder="CS301"
+                list="exam-course-codes"
                 className={inputCls}
-              >
-                <option value="">Select…</option>
+              />
+              <datalist id="exam-course-codes">
+                {modules.map(([code]) => (
+                  <option key={code} value={code} />
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="exam-name" className="text-sm font-medium">Course name</label>
+              <input
+                id="exam-name"
+                value={form.moduleName}
+                onChange={(e) => setForm((f) => ({ ...f, moduleName: e.target.value }))}
+                placeholder="Data Structures"
+                list="exam-course-names"
+                className={inputCls}
+              />
+              <datalist id="exam-course-names">
                 {modules.map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {code} · {name}
+                  <option key={code} value={name}>
+                    {code}
                   </option>
                 ))}
-              </select>
+              </datalist>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="exam-type" className="text-sm font-medium">Type</label>
@@ -655,9 +740,10 @@ function ManageExams({
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" aria-hidden /> Create exam & assign seats
+            <Plus className="h-4 w-4" aria-hidden /> {saving ? "Creating…" : "Create exam & assign seats"}
           </button>
           <p className="text-xs text-muted-foreground">
             Seats are auto-assigned to enrolled students in roll-number order.
@@ -677,7 +763,7 @@ function ManageExams({
                 </p>
               </div>
               <button
-                onClick={() => setExams((prev) => prev.filter((e) => e.id !== ex.id))}
+                onClick={() => remove(ex.id)}
                 className="rounded-sm p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label={`Delete ${ex.moduleCode}`}
               >

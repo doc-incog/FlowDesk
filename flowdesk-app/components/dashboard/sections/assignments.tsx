@@ -389,27 +389,50 @@ function ManageAssignments({
     maxMarks: 20,
   })
   const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  const add = () => {
-    if (!form.moduleCode || !form.title || !form.dueDate) {
-      setError("Module, title and due date are required.")
+  const add = async () => {
+    if (!form.moduleCode || !form.moduleName || !form.title || !form.dueDate) {
+      setError("Course code, course name, title and due date are required.")
       return
     }
-    setAssignments((prev) => [
-      ...prev,
-      {
-        id: `A${Date.now()}`,
-        moduleCode: form.moduleCode,
-        moduleName: form.moduleName,
-        title: form.title,
-        description: form.description,
-        assignedDate: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
-        dueDate: form.dueDate,
-        maxMarks: Number(form.maxMarks) || 20,
-      },
-    ])
-    setForm({ moduleCode: "", moduleName: "", title: "", description: "", dueDate: "", maxMarks: 20 })
+    setSaving(true)
     setError("")
+    try {
+      const res = await fetch("/api/assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          assignedDate: new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }),
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setError(d?.error ?? "Could not create the assignment.")
+        return
+      }
+      if (d?.assignment) {
+        setAssignments((prev) => [
+          ...prev,
+          { ...d.assignment, submission: undefined } as Assignment,
+        ])
+      }
+      setForm({ moduleCode: "", moduleName: "", title: "", description: "", dueDate: "", maxMarks: 20 })
+    } catch {
+      setError("Network error while creating the assignment.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (id: string) => {
+    try {
+      const res = await fetch(`/api/assignments/${id}`, { method: "DELETE" })
+      if (res.ok) setAssignments((prev) => prev.filter((x) => x.id !== id))
+    } catch {
+      // List refreshes on next visit
+    }
   }
 
   const inputCls =
@@ -420,24 +443,41 @@ function ManageAssignments({
       <Card>
         <SectionHeading title="Create assignment" />
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label htmlFor="asg-module" className="text-sm font-medium">Module</label>
-            <select
-              id="asg-module"
-              value={form.moduleCode}
-              onChange={(e) => {
-                const m = modules.find(([code]) => code === e.target.value)
-                setForm((f) => ({ ...f, moduleCode: e.target.value, moduleName: m ? m[1] : "" }))
-              }}
-              className={inputCls}
-            >
-              <option value="">Select…</option>
-              {modules.map(([code, name]) => (
-                <option key={code} value={code}>
-                  {code} · {name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="asg-code" className="text-sm font-medium">Course code</label>
+              <input
+                id="asg-code"
+                value={form.moduleCode}
+                onChange={(e) => setForm((f) => ({ ...f, moduleCode: e.target.value.toUpperCase() }))}
+                placeholder="CS301"
+                list="asg-course-codes"
+                className={inputCls}
+              />
+              <datalist id="asg-course-codes">
+                {modules.map(([code]) => (
+                  <option key={code} value={code} />
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="asg-name" className="text-sm font-medium">Course name</label>
+              <input
+                id="asg-name"
+                value={form.moduleName}
+                onChange={(e) => setForm((f) => ({ ...f, moduleName: e.target.value }))}
+                placeholder="Data Structures"
+                list="asg-course-names"
+                className={inputCls}
+              />
+              <datalist id="asg-course-names">
+                {modules.map(([code, name]) => (
+                  <option key={code} value={name}>
+                    {code}
+                  </option>
+                ))}
+              </datalist>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label htmlFor="asg-title" className="text-sm font-medium">Title</label>
@@ -466,9 +506,10 @@ function ManageAssignments({
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <button
             onClick={add}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" aria-hidden /> Create assignment
+            <Plus className="h-4 w-4" aria-hidden /> {saving ? "Creating…" : "Create assignment"}
           </button>
         </div>
       </Card>
@@ -476,6 +517,9 @@ function ManageAssignments({
       <Card>
         <SectionHeading title="All assignments" />
         <ul className="divide-y divide-border">
+          {assignments.length === 0 && (
+            <li className="py-6 text-center text-sm text-muted-foreground">No assignments yet.</li>
+          )}
           {assignments.map((a) => (
             <li key={a.id} className="flex items-center gap-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -485,7 +529,7 @@ function ManageAssignments({
                 </p>
               </div>
               <button
-                onClick={() => setAssignments((prev) => prev.filter((x) => x.id !== a.id))}
+                onClick={() => remove(a.id)}
                 className="rounded-sm p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label={`Delete ${a.title}`}
               >

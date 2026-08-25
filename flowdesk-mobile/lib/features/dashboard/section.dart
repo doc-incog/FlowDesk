@@ -9,7 +9,6 @@ enum SectionId {
   students('Students', Icons.school_outlined, {Role.staff, Role.admin}, 'students'),
   staff('Staff', Icons.groups_outlined, {Role.admin}, 'staff'),
   mentor('Mentor', Icons.person_outline_rounded, {Role.student, Role.staff}, 'mentor'),
-  chat('Messages', Icons.chat_bubble_outline_rounded, {Role.student, Role.staff, Role.admin}, 'chat'),
   schedule('Schedule', Icons.calendar_month_outlined, {Role.student, Role.staff, Role.admin}, 'schedule'),
   exams('Exams & Results', Icons.assignment_outlined, {Role.student, Role.staff, Role.admin}, 'exams'),
   assignments('Assignments', Icons.description_outlined, {Role.student, Role.staff, Role.admin}, 'assignments'),

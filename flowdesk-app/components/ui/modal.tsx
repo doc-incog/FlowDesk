@@ -20,11 +20,19 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
+  // Keep the latest onClose in a ref so the effects below don't re-run (and
+  // re-grab focus) every time the parent re-renders with a new inline handler.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
+
   const restoreFocus = useCallback(() => {
     previouslyFocused.current?.focus?.()
     previouslyFocused.current = null
   }, [])
 
+  // Initial focus — runs only when the modal opens/closes.
   useEffect(() => {
     if (!open) return
 
@@ -35,14 +43,20 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       const first = panel.querySelector<HTMLElement>(FOCUSABLE)
       first?.focus()
     }
+  }, [open])
+
+  // Focus trap + Escape handling.
+  useEffect(() => {
+    if (!open) return
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose()
+        onCloseRef.current()
         return
       }
-      if (e.key !== "Tab" || !panel) return
+      if (e.key !== "Tab" || !panelRef.current) return
 
+      const panel = panelRef.current
       const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
       if (focusables.length === 0) return
       const first = focusables[0]
@@ -61,7 +75,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       document.removeEventListener("keydown", onKey)
       restoreFocus()
     }
-  }, [open, onClose, restoreFocus])
+  }, [open, restoreFocus])
 
   if (!open) return null
 

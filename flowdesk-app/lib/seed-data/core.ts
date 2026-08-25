@@ -30,6 +30,7 @@ export type UserProfile = {
 
 export type CheckInRecord = {
   id: string
+  userId?: string
   name: string
   role: Role
   time: string

@@ -407,15 +407,10 @@ class _DuesTable extends StatelessWidget {
                             text: 'Paid · ${f.method?.label ?? 'UPI'}',
                             color: colors.success,
                             compact: true)
-                        : _isOverdue(f.dueDate)
-                            ? Pill(
-                                text: 'Overdue',
-                                color: colors.chart4,
-                                compact: true)
-                            : Pill(
-                                text: 'Pending',
-                                color: colors.warning,
-                                compact: true),
+                        : Pill(
+                            text: 'Pending',
+                            color: colors.warning,
+                            compact: true),
                   ),
                   Expanded(
                     flex: 2,
@@ -446,31 +441,6 @@ class _DuesTable extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  bool _isOverdue(String dueDate) {
-    try {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final parsed = _parseDate(dueDate);
-      return parsed != null && parsed.isBefore(today);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  DateTime? _parseDate(String text) {
-    const months = {
-      'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-      'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
-    };
-    final parts = text.split(' ');
-    if (parts.length != 3) return null;
-    final day = int.tryParse(parts[0]);
-    final month = months[parts[1]];
-    final year = int.tryParse(parts[2]);
-    if (day == null || month == null || year == null) return null;
-    return DateTime(year, month, day);
   }
 
   Widget _header(BuildContext context, String label, {bool right = false}) =>

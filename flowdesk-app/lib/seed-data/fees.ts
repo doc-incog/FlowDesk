@@ -36,8 +36,8 @@ export const RECEIPTS: Receipt[] = [
   { id: "RCP-7001", studentId: "STU-2043", studentName: "Aisha Karim", itemName: "Library Fee", amount: 3000, date: "04 Aug 2026", method: "ewallet", transactionId: "TXN-8812-4590" },
 ]
 
-export function formatINR(n: number): string {
-  return `₹${n.toLocaleString("en-IN")}`
+export function formatNPR(n: number): string {
+  return `Rs. ${n.toLocaleString("en-NP")}`
 }
 
 export const METHOD_LABEL: Record<PaymentMethod, string> = {

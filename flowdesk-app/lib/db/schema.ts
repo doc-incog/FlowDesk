@@ -76,7 +76,8 @@ export function createSchema(db: DatabaseSync) {
       time TEXT NOT NULL,
       category TEXT NOT NULL,
       unread INTEGER NOT NULL DEFAULT 1,
-      user_id TEXT REFERENCES users(id) ON DELETE CASCADE
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      target_role TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 
@@ -236,7 +237,7 @@ export function createSchema(db: DatabaseSync) {
 
     CREATE TABLE IF NOT EXISTS feedback_targets (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK (type IN ('teacher','event')),
+      type TEXT NOT NULL,
       name TEXT NOT NULL,
       subtitle TEXT NOT NULL
     );
@@ -246,6 +247,7 @@ export function createSchema(db: DatabaseSync) {
       target_id TEXT NOT NULL,
       rating INTEGER NOT NULL,
       comment TEXT NOT NULL,
+      by_id TEXT,
       by_name TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
