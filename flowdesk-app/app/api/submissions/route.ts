@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   const safeName = file.name.replace(/[^\w.\- ]/g, "_").slice(0, 120)
   const id = `su-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const uploadsDir = join(process.cwd(), ".data", "uploads")
+  const uploadsDir = join(process.env.RENDER_DISK_MOUNT_PATH || process.cwd(), ".data", "uploads")
   mkdirSync(uploadsDir, { recursive: true })
   const storedPath = join(uploadsDir, `${id}-${safeName}`)
   writeFileSync(storedPath, Buffer.from(await file.arrayBuffer()))

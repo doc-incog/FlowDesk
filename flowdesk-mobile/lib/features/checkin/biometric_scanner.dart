@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
+
+import '_local_auth_native.dart' if (dart.library.html) '_local_auth_stub.dart';
 
 import '../../core/theme/app_theme.dart';
 

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: flowdesk
+    runtime: node
+    plan: starter
+    buildCommand: cd flowdesk-app && npm install && npm run build
+    startCommand: cd flowdesk-app && npm start
+    disk:
+      name: flowdesk-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: SEED
+        value: "true"
+      - key: NODE_ENV
+        value: production

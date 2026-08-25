@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { createSchema, USERS_TABLE_DDL } from "@/lib/db/schema"
 import { seedDatabase } from "@/lib/db/seed"
 
-const DATA_DIR = join(process.cwd(), ".data")
+const DATA_DIR = join(process.env.RENDER_DISK_MOUNT_PATH || process.cwd(), ".data")
 const DB_PATH = join(DATA_DIR, "flowdesk.db")
 
 export type UserRow = {

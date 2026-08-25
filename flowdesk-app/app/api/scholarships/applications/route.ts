@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const uploadsDir = join(process.cwd(), ".data", "uploads")
+  const uploadsDir = join(process.env.RENDER_DISK_MOUNT_PATH || process.cwd(), ".data", "uploads")
   mkdirSync(uploadsDir, { recursive: true })
 
   const storedDocs: { name: string; path: string }[] = []
