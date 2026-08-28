@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth"
 import { getDb, findUserById, mapUser } from "@/lib/db"
 import { clockTime, localDate, localDateTime } from "@/lib/datetime"
 import { statusFor } from "@/lib/attendance"
+import { matchTemplate, lookupByFingerId, heartbeatDevice } from "@/lib/fingerprint"
 
 export const runtime = "nodejs"
 
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
   const sessionUser = await getSessionUser()
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  let body: { method?: string; deviceId?: string; source?: "web" | "device"; studentId?: string } = {}
+  let body: { method?: string; deviceId?: string; source?: "web" | "device"; studentId?: string; fingerId?: number; fingerprintTemplate?: string } = {}
   try {
     body = await request.json()
   } catch {
@@ -85,13 +86,32 @@ export async function POST(request: Request) {
   const db = getDb()
 
   // Web check-ins are attributed to the session user. Device posts (the future
-  // ESP32 flow) identify the student explicitly via studentId.
+  // ESP32 flow) identify the student explicitly via studentId, fingerprint
+  // template matching, or finger_id lookup.
   let target = sessionUser
   if (body.source === "device") {
-    const studentId = body.studentId?.trim()
-    if (!studentId) {
-      return NextResponse.json({ error: "studentId is required for device check-ins" }, { status: 400 })
+    const deviceId = body.deviceId?.trim()
+    if (deviceId) heartbeatDevice(deviceId)
+
+    let studentId = body.studentId?.trim()
+
+    // If no studentId provided but a fingerprint template is sent, match it server-side
+    if (!studentId && body.fingerprintTemplate && deviceId) {
+      const templateBuf = Buffer.from(body.fingerprintTemplate, "base64")
+      const match = matchTemplate(templateBuf, deviceId)
+      if (match) studentId = match.userId
     }
+
+    // If still no studentId but a fingerId is sent, look up the user mapping
+    if (!studentId && body.fingerId != null && deviceId) {
+      const lookup = lookupByFingerId(deviceId, body.fingerId)
+      if (lookup) studentId = lookup.userId
+    }
+
+    if (!studentId) {
+      return NextResponse.json({ error: "Unable to identify student. Provide studentId, fingerId, or fingerprintTemplate." }, { status: 400 })
+    }
+
     const row = findUserById(studentId)
     if (!row) return NextResponse.json({ error: "Unknown student" }, { status: 404 })
     target = mapUser(row)

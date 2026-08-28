@@ -287,5 +287,54 @@ export function createSchema(db: DatabaseSync) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS fingerprint_templates (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      finger_id INTEGER NOT NULL,
+      device_id TEXT NOT NULL,
+      template BLOB,
+      enrolled_by TEXT,
+      enrolled_at TEXT NOT NULL,
+      UNIQUE(user_id, device_id, finger_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_fp_user ON fingerprint_templates(user_id);
+    CREATE INDEX IF NOT EXISTS idx_fp_device ON fingerprint_templates(device_id);
+
+    CREATE TABLE IF NOT EXISTS fingerprint_commands (
+      id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL,
+      command TEXT NOT NULL,
+      params TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','sent','completed','failed')),
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_fp_cmd_device ON fingerprint_commands(device_id, status);
+
+    CREATE TABLE IF NOT EXISTS fingerprint_devices (
+      device_id TEXT PRIMARY KEY,
+      label TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      device_secret TEXT,
+      sensor_type TEXT NOT NULL DEFAULT 'R307',
+      status TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('pending','approved','disabled')),
+      last_seen TEXT,
+      enrolled_count INTEGER NOT NULL DEFAULT 0,
+      slots_total INTEGER NOT NULL DEFAULT 162,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS fingerprint_device_health (
+      id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL REFERENCES fingerprint_devices(device_id) ON DELETE CASCADE,
+      sensor_connected INTEGER NOT NULL,
+      sensor_capacity INTEGER,
+      free_memory INTEGER,
+      wifi_rssi INTEGER,
+      uptime_seconds INTEGER,
+      recorded_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_fp_health_device ON fingerprint_device_health(device_id, recorded_at);
   `)
 }

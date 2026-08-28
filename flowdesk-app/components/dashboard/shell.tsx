@@ -23,6 +23,7 @@ import {
   MessageSquareText,
   MessageSquare,
   ShieldCheck,
+  Fingerprint,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { NotificationItem, Role } from "@/lib/seed-data/core"
@@ -47,6 +48,7 @@ import { FeedbackSection } from "@/components/dashboard/sections/feedback"
 import { ProfileSection } from "@/components/dashboard/sections/profile"
 import { RolesSection } from "@/components/dashboard/sections/roles"
 import { ChatSection } from "@/components/dashboard/sections/chat"
+import { FingerprintSection } from "@/components/dashboard/sections/fingerprint"
 
 export type SectionId =
   | "overview"
@@ -66,6 +68,7 @@ export type SectionId =
   | "feedback"
   | "profile"
   | "roles"
+  | "fingerprint"
 
 type NavItem = {
   id: SectionId
@@ -92,6 +95,7 @@ const NAV: NavItem[] = [
   { id: "feedback", label: "Feedback", icon: MessageSquareText, roles: ["student", "staff", "admin"] },
   { id: "profile", label: "Profile", icon: UserRound, roles: ["student", "staff", "admin"] },
   { id: "roles", label: "Roles & permissions", icon: ShieldCheck, roles: ["admin"] },
+  { id: "fingerprint", label: "Fingerprint", icon: Fingerprint, roles: ["admin"] },
 ]
 
 const ROLE_META: Record<Role, { label: string; blurb: string; accent: string }> = {
@@ -172,7 +176,7 @@ export function DashboardShell() {
       case "overview":
         return <OverviewSection role={user.role} onNavigate={setActive} />
       case "checkin":
-        return <CheckInSection role={user.role} userName={user.name} />
+        return <CheckInSection role={user.role} userName={user.name} userId={user.id} />
       case "notifications":
         return <NotificationsSection role={user.role} />
       case "students":
@@ -203,6 +207,8 @@ export function DashboardShell() {
         return <ProfileSection />
       case "roles":
         return <RolesSection />
+      case "fingerprint":
+        return <FingerprintSection />
       default:
         return null
     }

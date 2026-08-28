@@ -20,4 +20,5 @@ export const SECTION_KEYS = [
   "feedback",
   "profile",
   "roles",
+  "fingerprint",
 ] as const

@@ -5,9 +5,6 @@ import { localDate } from "@/lib/datetime"
 
 export const runtime = "nodejs"
 
-// Campus-level facts not tracked in the DB yet (prototype constants).
-const CAMPUS = { biometricDevices: 8, devicesOnline: 7 }
-
 export async function GET() {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -62,6 +59,15 @@ export async function GET() {
 
   const studentIds = db.prepare("SELECT id FROM users WHERE role = 'student'").all() as { id: string }[]
   const staffCount = (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'staff'").get() as { n: number }).n
+
+  // Live fingerprint device stats from DB
+  const fpDevices = db.prepare("SELECT device_id, last_seen, enrolled_count FROM fingerprint_devices").all() as {
+    device_id: string; last_seen: string | null; enrolled_count: number
+  }[]
+  const totalDevices = fpDevices.length
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const onlineDevices = fpDevices.filter((d) => d.last_seen && d.last_seen > fiveMinAgo).length
+  const CAMPUS = { biometricDevices: totalDevices || 0, devicesOnline: onlineDevices }
 
   const myCheckIn = checkIns.find((c) => c.user_id === user.id)
   const myHistory = db

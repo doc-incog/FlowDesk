@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CheckCircle2, Clock, Fingerprint, Search, Calendar } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { CheckCircle2, Clock, Fingerprint, Search, Calendar, Wifi, WifiOff, Loader2 } from "lucide-react"
 import type { CheckInRecord, Role, UserProfile } from "@/lib/seed-data/core"
-import { BiometricScanner } from "@/components/biometric-scanner"
 import { Card, RoleBadge, SectionHeading, StatusBadge } from "@/components/dashboard/primitives"
+import { FingerprintEnrollmentWizard } from "@/components/dashboard/sections/fingerprint-enrollment-wizard"
 import { cn } from "@/lib/utils"
 
 type HistoryRecord = {
@@ -29,6 +29,24 @@ type HistorySummary = {
   percentage: number
 }
 
+type Device = {
+  device_id: string
+  label: string
+  location: string
+  last_seen: string | null
+  enrolled_count: number
+  slots_total: number
+}
+
+type FpEnrollment = {
+  id: string
+  fingerId: number
+  deviceId: string
+  label: string
+  location: string
+  enrolledAt: string
+}
+
 function nowTime() {
   return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
 }
@@ -38,12 +56,10 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-export function CheckInSection({ role, userName }: { role: Role; userName: string }) {
+export function CheckInSection({ role, userName, userId }: { role: Role; userName: string; userId?: string }) {
   const [records, setRecords] = useState<CheckInRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [checkinError, setCheckinError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
   // Date picker for daily log
   const [selectedDate, setSelectedDate] = useState(todayStr())
@@ -63,6 +79,13 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   const [people, setPeople] = useState<PersonOption[]>([])
   const [personId, setPersonId] = useState("")
 
+  // Fingerprint state (student only)
+  const [fpEnrolled, setFpEnrolled] = useState<boolean | null>(null)
+  const [fpEnrollments, setFpEnrollments] = useState<FpEnrollment[]>([])
+  const [fpDevices, setFpDevices] = useState<Device[]>([])
+  const [showWizard, setShowWizard] = useState(false)
+  const checkinPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // Fetch daily records when date changes
   useEffect(() => {
     let alive = true
@@ -78,8 +101,59 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     return () => { alive = false }
   }, [selectedDate])
 
-  // Load the people that can be inspected: staff get their mentees,
-  // admins get every student and staff member.
+  // Load fingerprint status for students
+  useEffect(() => {
+    if (role !== "student" || !userId) return
+    let alive = true
+
+    const loadFpStatus = async () => {
+      try {
+        const [statusRes, devicesRes] = await Promise.all([
+          fetch(`/api/fingerprint/enroll/status?userId=${encodeURIComponent(userId)}`),
+          fetch("/api/fingerprint/devices"),
+        ])
+        const statusData = await statusRes.json()
+        const devicesData = await devicesRes.json()
+
+        if (!alive) return
+        setFpEnrolled(statusData.enrolled ?? false)
+        setFpEnrollments(statusData.enrollments ?? [])
+        setFpDevices(devicesData.devices ?? [])
+      } catch {
+        if (alive) setFpEnrolled(false)
+      }
+    }
+
+    loadFpStatus()
+    return () => { alive = false }
+  }, [role, userId])
+
+  // Auto-refresh when enrolled but not checked in today
+  const checkedIn = role === "student" && selectedDate === todayStr() && records.length > 0
+
+  useEffect(() => {
+    if (role !== "student" || checkedIn || !fpEnrolled) {
+      if (checkinPollRef.current) { clearInterval(checkinPollRef.current); checkinPollRef.current = null }
+      return
+    }
+
+    checkinPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/checkins?date=${todayStr()}`)
+        const data = await res.json()
+        if (data?.records?.length > 0) {
+          setRecords(data.records)
+          if (checkinPollRef.current) { clearInterval(checkinPollRef.current); checkinPollRef.current = null }
+        }
+      } catch {
+        // retry
+      }
+    }, 10000)
+
+    return () => { if (checkinPollRef.current) { clearInterval(checkinPollRef.current); checkinPollRef.current = null } }
+  }, [role, checkedIn, fpEnrolled])
+
+  // Load the people that can be inspected
   useEffect(() => {
     if (role === "student") return
     let alive = true
@@ -99,13 +173,8 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         setPeople(list.sort((a, b) => a.name.localeCompare(b.name)))
       })
       .catch(() => {})
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [role, userName])
-
-  // Derive checkedIn from records instead of using a separate effect
-  const checkedIn = role === "student" && selectedDate === todayStr() && records.length > 0
 
   const doFetchHistory = (opts?: { userId?: string }) => {
     setHistoryLoading(true)
@@ -141,26 +210,16 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     }
   }
 
-  const handleVerified = async (method: "webauthn" | "biometric") => {
-    if (checkedIn || busy) return
-    setBusy(true)
-    setCheckinError(null)
-    try {
-      const res = await fetch("/api/checkins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method }),
-      })
-      const data = await res.json()
-      if (data?.record || data?.alreadyCheckedIn) {
-        if (data?.record) setRecords((prev) => [data.record, ...prev])
-      } else {
-        setCheckinError(data?.error ?? "Check-in failed")
-      }
-    } catch {
-      setCheckinError("Check-in failed")
-    } finally {
-      setBusy(false)
+  const handleWizardComplete = async () => {
+    setShowWizard(false)
+    // Refresh fingerprint status
+    if (userId) {
+      try {
+        const res = await fetch(`/api/fingerprint/enroll/status?userId=${encodeURIComponent(userId)}`)
+        const data = await res.json()
+        setFpEnrolled(data.enrolled ?? false)
+        setFpEnrollments(data.enrollments ?? [])
+      } catch { /* silent */ }
     }
   }
 
@@ -180,17 +239,17 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   return (
     <div className="space-y-6">
       <SectionHeading
-        title={role === "student" ? "Biometric check-in" : role === "staff" ? "Mentee attendance" : "Attendance overview"}
+        title={role === "student" ? "Fingerprint check-in" : role === "staff" ? "Mentee attendance" : "Attendance overview"}
         description={
           role === "student"
-            ? "Place your finger on the scanner to record attendance."
+            ? "Use the fingerprint sensor to record your attendance."
             : role === "staff"
               ? "View attendance records for your mentees."
               : "View and filter attendance records for all users."
         }
       />
 
-      {/* Scanner — student only */}
+      {/* Student sensor status */}
       {role === "student" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           <Card className="flex flex-col items-center justify-center gap-6 py-10 lg:col-span-2">
@@ -204,18 +263,64 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
                   <p className="mt-1 font-mono text-sm text-muted-foreground">{userName} · {nowTime()}</p>
                 </div>
               </div>
-            ) : (
-              <>
-                {checkinError && (
-                  <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {checkinError}
+            ) : showWizard ? (
+              <FingerprintEnrollmentWizard
+                userId={userId ?? ""}
+                userName={userName}
+                devices={fpDevices}
+                onComplete={handleWizardComplete}
+                onCancel={() => setShowWizard(false)}
+              />
+            ) : fpEnrolled === false ? (
+              /* Not enrolled — show registration prompt */
+              <div className="flex flex-col items-center gap-5 text-center">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/30 bg-secondary/50">
+                  <Fingerprint className="h-11 w-11 text-muted-foreground/50" />
+                </div>
+                <div>
+                  <p className="font-semibold">No fingerprint registered</p>
+                  <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                    Register your fingerprint at a sensor device to check in.
                   </p>
+                </div>
+                <button
+                  onClick={() => setShowWizard(true)}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                >
+                  <Fingerprint className="h-4 w-4" /> Register Fingerprint
+                </button>
+              </div>
+            ) : fpEnrolled === null ? (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Checking fingerprint status...</p>
+              </div>
+            ) : (
+              /* Enrolled but not checked in — show sensor prompt */
+              <div className="flex flex-col items-center gap-5 text-center">
+                <div className="relative">
+                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-primary/40 bg-primary/5">
+                    <Fingerprint className="h-14 w-14 text-primary animate-pulse" />
+                  </div>
+                  <span className="absolute inset-0 animate-ping rounded-full border-2 border-primary/20" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-primary">Go to the sensor</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Place your finger on the sensor to check in.</p>
+                </div>
+                {fpEnrollments.length > 0 && (
+                  <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
+                    {fpEnrollments.map((e) => (
+                      <div key={e.id} className="flex items-center gap-1.5">
+                        <Wifi className="h-3 w-3 text-success" />
+                        <span className="font-medium">{e.label}</span>
+                        {e.location && <span>· {e.location}</span>}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                <BiometricScanner label="Tap to check in" onVerified={handleVerified} />
-                <p className="max-w-xs text-center text-xs text-muted-foreground">
-                  Demo simulation: your fingerprint template never leaves the device — only a pass/fail signal is recorded.
-                </p>
-              </>
+                <p className="text-xs text-muted-foreground/60">Auto-checks every 10 seconds</p>
+              </div>
             )}
           </Card>
 
