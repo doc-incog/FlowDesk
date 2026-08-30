@@ -88,7 +88,7 @@ export async function PATCH(
   }
 
   const count = (
-    db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ?").get(target) as { n: number }
+    db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ? AND is_deleted = 0").get(target) as { n: number }
   ).n
   return NextResponse.json({
     ok: true,
@@ -120,7 +120,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Built-in roles cannot be deleted" }, { status: 400 })
   }
 
-  const assigned = (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ?").get(key) as { n: number }).n
+  const assigned = (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ? AND is_deleted = 0").get(key) as { n: number }).n
   if (assigned > 0) {
     return NextResponse.json({ error: "Move people out of this role before deleting it" }, { status: 400 })
   }

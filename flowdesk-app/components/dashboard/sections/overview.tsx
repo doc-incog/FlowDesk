@@ -15,6 +15,19 @@ import {
 import type { NotificationItem, Role, ScheduleSlot } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard, StatusBadge } from "@/components/dashboard/primitives"
 import type { SectionId } from "@/components/dashboard/shell"
+import { cn } from "@/lib/utils"
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
+}
 
 const GREETING = () => {
   const h = new Date().getHours()
@@ -62,16 +75,21 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
 
   useEffect(() => {
     let alive = true
-    fetch("/api/overview")
-      .then((r) => r.json())
-      .then((j) => {
-        if (!alive) return
-        if (j?.error) setError(j.error)
-        else setData(j)
-      })
-      .catch(() => alive && setError("Failed to load"))
+    const load = () => {
+      fetch("/api/overview")
+        .then((r) => r.json())
+        .then((j) => {
+          if (!alive) return
+          if (j?.error) setError(j.error)
+          else setData(j)
+        })
+        .catch(() => alive && setError("Failed to load"))
+    }
+    load()
+    const timer = setInterval(load, 30000)
     return () => {
       alive = false
+      clearInterval(timer)
     }
   }, [])
 
@@ -156,7 +174,9 @@ export function OverviewSection({ role, onNavigate }: { role: Role; onNavigate: 
                     <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{n.title}</p>
-                      <p className="text-xs text-muted-foreground">{n.time}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {n.createdAt ? relativeTime(n.createdAt) : n.time}
+                      </p>
                     </div>
                   </li>
                 ))}

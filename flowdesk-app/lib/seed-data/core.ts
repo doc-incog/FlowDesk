@@ -45,6 +45,7 @@ export type NotificationItem = {
   time: string
   category: "academic" | "event" | "alert" | "system"
   unread: boolean
+  createdAt?: string
 }
 
 export type ScheduleSlot = {

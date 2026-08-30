@@ -12,14 +12,16 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const db = getDb()
+  // Students see only their own complaints; staff and admin see all.
+  const showAll = user.role === "admin" || user.role === "staff"
   const rows = db
     .prepare(
       `SELECT id, category, subject, description, status, created_at, raised_by_name, raised_by_role, comments
        FROM complaints
-       ${user.role === "admin" ? "" : "WHERE raised_by_id = ?"}
+       ${showAll ? "" : "WHERE raised_by_id = ?"}
        ORDER BY created_at DESC`,
     )
-    .all(...(user.role === "admin" ? [] : [user.id])) as {
+    .all(...(showAll ? [] : [user.id])) as {
     id: string
     category: string
     subject: string

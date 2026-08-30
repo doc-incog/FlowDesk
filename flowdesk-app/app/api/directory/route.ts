@@ -23,12 +23,12 @@ export async function GET() {
   const db = getDb()
 
   const students = db
-    .prepare("SELECT * FROM users WHERE role = 'student' ORDER BY name")
+    .prepare("SELECT * FROM users WHERE role = 'student' AND is_deleted = 0 ORDER BY name")
     .all()
     .map((r) => mapUser(r as Parameters<typeof mapUser>[0]))
 
   const staff = db
-    .prepare("SELECT * FROM users WHERE role = 'staff' ORDER BY name")
+    .prepare("SELECT * FROM users WHERE role = 'staff' AND is_deleted = 0 ORDER BY name")
     .all()
     .map((r) => mapUser(r as Parameters<typeof mapUser>[0]))
 

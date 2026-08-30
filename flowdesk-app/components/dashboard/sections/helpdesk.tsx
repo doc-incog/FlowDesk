@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MessageSquare, Plus, Send } from "lucide-react"
+import { MessageSquare, Plus, Send, Trash2 } from "lucide-react"
 import type { Role, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -234,6 +234,22 @@ function ComplaintCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [comment, setComment] = useState("")
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const canDelete = me.role === "admin" || complaint.raisedByName === me.name
+
+  const deleteComplaint = async () => {
+    try {
+      const res = await fetch(`/api/complaints/${complaint.id}`, { method: "DELETE" })
+      if (res.ok) {
+        setComplaints((prev) => prev.filter((c) => c.id !== complaint.id))
+      }
+    } catch {
+      // Optimistic
+      setComplaints((prev) => prev.filter((c) => c.id !== complaint.id))
+    }
+    setConfirmingDelete(false)
+  }
 
   const addComment = async () => {
     if (!comment.trim()) return
@@ -277,6 +293,32 @@ function ComplaintCard({
           <span className="ml-auto font-mono text-xs text-muted-foreground">
             {complaint.id} · {complaint.createdAt}
           </span>
+          {canDelete && (
+            confirmingDelete ? (
+              <span className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={deleteComplaint}
+                  className="rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  No
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                aria-label={`Delete complaint ${complaint.id}`}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
+            )
+          )}
         </div>
         <p className="font-semibold">{complaint.subject}</p>
         <p className="text-sm text-muted-foreground">{complaint.description}</p>

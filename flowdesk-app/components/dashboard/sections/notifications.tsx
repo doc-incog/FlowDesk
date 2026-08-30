@@ -6,6 +6,18 @@ import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
 const CATEGORY_META: Record<
   NotificationItem["category"],
   { icon: typeof BookOpen; label: string; className: string }
@@ -69,7 +81,7 @@ export function NotificationsSection({ role }: { role: Role }) {
 
   // Real-time-ish: poll for new notifications while the section is open.
   useEffect(() => {
-    const timer = setInterval(load, 5000)
+    const timer = setInterval(load, 3000)
     return () => clearInterval(timer)
   }, [load])
 
@@ -276,7 +288,9 @@ export function NotificationsSection({ role }: { role: Role }) {
                   )}
                 </div>
                 <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{n.body}</p>
-                <p className="mt-2 font-mono text-xs text-muted-foreground">{n.time}</p>
+                <p className="mt-2 font-mono text-xs text-muted-foreground">
+                  {n.createdAt ? relativeTime(n.createdAt) : n.time}
+                </p>
               </div>
               {role === "admin" &&
                 (confirmingDeleteId === n.id ? (

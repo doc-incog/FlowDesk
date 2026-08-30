@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MessageSquare, Plus, Send, Search, Trash2 } from "lucide-react"
+import { MessageSquare, EyeOff, Plus, Send, Search, Trash2 } from "lucide-react"
 import type { UserProfile } from "@/lib/seed-data/core"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
-type Participant = { id: string; name: string; avatarInitials: string; role: string }
+type Participant = { id: string; name: string; avatarInitials: string; role: string; deleted?: boolean }
 
 type Conversation = {
   id: string
@@ -65,6 +65,7 @@ export function ChatSection({ role }: { role: string }) {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([])
   const [searching, setSearching] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [confirmingHideId, setConfirmingHideId] = useState<string | null>(null)
   const [sidebarFilter, setSidebarFilter] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -233,11 +234,31 @@ export function ChatSection({ role }: { role: string }) {
 
   const activeConversation = conversations.find((c) => c.id === activeId)
 
+  // For a direct chat, the "other" participant may have been deleted. Their
+  // messages remain readable but the thread becomes read-only.
+  const otherDeleted =
+    activeConversation?.type === "direct" &&
+    (activeConversation.participants.find((p) => p.id !== me?.id)?.deleted ?? false)
+
   // Deleting a conversation removes it for everyone, so clear the open thread
   // if it is the one being deleted.
+  const hideConversation = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}?action=hide`, { method: "DELETE" })
+    } catch {
+      // The sidebar refresh below will reconcile the list
+    }
+    setConfirmingHideId(null)
+    if (activeId === id) {
+      setActiveId(null)
+      setMessages([])
+    }
+    refreshConversations()
+  }
+
   const deleteConversation = async (id: string) => {
     try {
-      await fetch(`/api/conversations/${id}`, { method: "DELETE" })
+      await fetch(`/api/conversations/${id}?action=delete`, { method: "DELETE" })
     } catch {
       // The sidebar refresh below will reconcile the list
     }
@@ -317,6 +338,12 @@ export function ChatSection({ role }: { role: string }) {
                 type="search"
                 value={sidebarFilter}
                 onChange={(e) => setSidebarFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return
+                  const q = sidebarFilter.trim().toLowerCase()
+                  const visible = q ? conversations.filter((c) => c.title.toLowerCase().includes(q) || c.participants.some((p) => p.name.toLowerCase().includes(q)) || (c.lastMessage ?? "").toLowerCase().includes(q)) : conversations
+                  if (visible.length > 0) loadMessages(visible[0].id)
+                }}
                 placeholder="Search conversations…"
                 aria-label="Search conversations"
                 className="w-full rounded-sm border border-input bg-card py-2 pl-8 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -350,6 +377,8 @@ export function ChatSection({ role }: { role: string }) {
                 const other = conv.participants.find((p) => p.id !== me?.id)
                 const isActive = conv.id === activeId
                 const confirmingDelete = confirmingDeleteId === conv.id
+                const confirmingHide = confirmingHideId === conv.id
+                const confirming = confirmingDelete || confirmingHide
                 return (
                   <div
                     key={conv.id}
@@ -357,6 +386,7 @@ export function ChatSection({ role }: { role: string }) {
                     tabIndex={0}
                     onClick={() => {
                       if (confirmingDeleteId && confirmingDeleteId !== conv.id) setConfirmingDeleteId(null)
+                      if (confirmingHideId && confirmingHideId !== conv.id) setConfirmingHideId(null)
                       loadMessages(conv.id)
                     }}
                     onKeyDown={(e) => {
@@ -376,7 +406,7 @@ export function ChatSection({ role }: { role: string }) {
                         <p className="truncate text-sm font-semibold">
                           {other?.name ?? conv.title}
                         </p>
-                        {conv.lastMessageAt && (
+                        {conv.lastMessageAt && !confirming && (
                           <span className="shrink-0 text-[10px] text-muted-foreground">
                             {relativeTime(conv.lastMessageAt)}
                           </span>
@@ -385,8 +415,10 @@ export function ChatSection({ role }: { role: string }) {
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-xs text-muted-foreground">
                           {confirmingDelete
-                            ? "Delete for everyone?"
-                            : conv.lastMessage || "No messages yet"}
+                            ? "Delete permanently?"
+                            : confirmingHide
+                              ? "Hide conversation?"
+                              : conv.lastMessage || "No messages yet"}
                         </p>
                         {confirmingDelete ? (
                           <span className="flex shrink-0 items-center gap-1">
@@ -410,24 +442,62 @@ export function ChatSection({ role }: { role: string }) {
                               No
                             </button>
                           </span>
-                        ) : (
-                          <>
-                            {conv.unreadCount > 0 && (
-                              <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                                {conv.unreadCount}
-                              </span>
-                            )}
+                        ) : confirmingHide ? (
+                          <span className="flex shrink-0 items-center gap-1">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setConfirmingDeleteId(conv.id)
+                                hideConversation(conv.id)
                               }}
-                              aria-label={`Delete conversation with ${other?.name ?? conv.title}`}
-                              title="Delete conversation (for everyone)"
-                              className="hidden shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive group-hover:block"
+                              className="rounded-sm bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground"
                             >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              Hide
                             </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setConfirmingHideId(null)
+                              }}
+                              aria-label="Cancel hide"
+                              className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                            >
+                              No
+                            </button>
+                          </span>
+                        ) : (
+                          <>
+                            {conv.unreadCount > 0 && (
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+                                <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                                  {conv.unreadCount}
+                                </span>
+                              </span>
+                            )}
+                            <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmingHideId(conv.id)
+                                }}
+                                aria-label={`Hide conversation with ${other?.name ?? conv.title}`}
+                                title="Hide conversation"
+                                className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmingDeleteId(conv.id)
+                                }}
+                                aria-label={`Delete conversation with ${other?.name ?? conv.title}`}
+                                title="Delete permanently"
+                                className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            </span>
                           </>
                         )}
                       </div>
@@ -499,30 +569,36 @@ export function ChatSection({ role }: { role: string }) {
 
               {/* Input bar */}
               <div className="border-t border-border px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        sendMessage()
-                      }
-                    }}
-                    rows={1}
-                    placeholder="Type a message…"
-                    aria-label="Message input"
-                    className="min-h-[40px] max-h-[120px] w-full resize-none rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || sending}
-                    aria-label="Send message"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    <Send className="h-4 w-4" aria-hidden />
-                  </button>
-                </div>
+                {otherDeleted ? (
+                  <p className="rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-center text-xs text-muted-foreground">
+                    This user is no longer available — the conversation is read-only.
+                  </p>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                      rows={1}
+                      placeholder="Type a message…"
+                      aria-label="Message input"
+                      className="min-h-[40px] max-h-[120px] w-full resize-none rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || sending}
+                      aria-label="Send message"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

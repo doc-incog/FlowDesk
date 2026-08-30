@@ -62,6 +62,11 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   // Per-person history (staff: mentees, admin: anyone)
   const [people, setPeople] = useState<PersonOption[]>([])
   const [personId, setPersonId] = useState("")
+  const [personQuery, setPersonQuery] = useState("")
+
+  // Manual attendance marking (staff, when the fingerprint scanner is down)
+  const [markingId, setMarkingId] = useState<string | null>(null)
+  const [markError, setMarkError] = useState<string | null>(null)
 
   // Fetch daily records when date changes
   useEffect(() => {
@@ -83,18 +88,25 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   useEffect(() => {
     if (role === "student") return
     let alive = true
-    fetch("/api/directory")
+    fetch(role === "staff" ? "/api/mentor" : "/api/directory")
       .then((r) => r.json())
       .then((d) => {
         if (!alive || d?.error) return
-        const students = (d?.students ?? []) as UserProfile[]
-        let list: PersonOption[] = students.map((s) => ({ id: s.id, name: s.name, role: "student" }))
+        let list: PersonOption[] = []
         if (role === "staff") {
-          const mentor = (d?.mentors ?? []).find((m: { name: string }) => m.name === userName)
-          list = mentor ? students.filter((s) => s.mentorId === mentor.id).map((s) => ({ id: s.id, name: s.name, role: "student" })) : []
+          // Staff see the students they mentor (authoritative via /api/mentor)
+          list = ((d.mentees ?? []) as UserProfile[]).map((s) => ({
+            id: s.id,
+            name: s.name,
+            role: "student",
+          }))
         } else {
+          const students = (d?.students ?? []) as UserProfile[]
           const staff = (d?.staff ?? []).map((s: UserProfile) => ({ id: s.id, name: s.name, role: s.role }))
-          list = [...list, ...staff]
+          list = [
+            ...students.map((s) => ({ id: s.id, name: s.name, role: "student" as const })),
+            ...staff,
+          ]
         }
         setPeople(list.sort((a, b) => a.name.localeCompare(b.name)))
       })
@@ -102,7 +114,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     return () => {
       alive = false
     }
-  }, [role, userName])
+  }, [role])
 
   // Derive checkedIn from records instead of using a separate effect
   const checkedIn = role === "student" && selectedDate === todayStr() && records.length > 0
@@ -116,6 +128,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     if (historyTo) params.set("to", historyTo)
     if (uid) params.set("userId", uid)
     else if (role === "admin" && roleFilter !== "all") params.set("role", roleFilter)
+    else if (personQuery.trim()) params.set("name", personQuery.trim())
 
     fetch(`/api/checkins/history?${params.toString()}`)
       .then((r) => r.json())
@@ -164,6 +177,33 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     }
   }
 
+  const handleManualMark = async (studentId: string, status: "present" | "late" | "absent") => {
+    setMarkingId(studentId)
+    setMarkError(null)
+    try {
+      const res = await fetch("/api/checkins/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, status }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMarkError(data?.error ?? "Could not mark attendance.")
+        return
+      }
+      if (data?.record) {
+        setRecords((prev) => {
+          const rest = prev.filter((r) => r.userId !== studentId)
+          return [data.record, ...rest]
+        })
+      }
+    } catch {
+      setMarkError("Network error while marking attendance.")
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
   if (loading && records.length === 0) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
   if (error) return <p role="alert" className="text-sm text-destructive">{error}</p>
 
@@ -173,6 +213,21 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   const total = records.length
   const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0
   const selectedPerson = people.find((p) => p.id === personId)
+  const filteredPeople = personQuery.trim()
+    ? people.filter((p) => p.name.toLowerCase().includes(personQuery.toLowerCase()))
+    : people
+
+  // The manual-marking panel is only useful on today's view: map each mentee's
+  // current status from today's check-ins (people without a row are unmarked).
+  const isToday = selectedDate === todayStr()
+  const todayStatusMap = new Map<string, "on-time" | "late" | "absent">()
+  if (isToday && role === "staff") {
+    for (const r of records) {
+      if (r.userId && (r.status === "on-time" || r.status === "late" || r.status === "absent")) {
+        todayStatusMap.set(r.userId, r.status)
+      }
+    }
+  }
 
   const inputCls =
     "rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -305,6 +360,63 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         </div>
       )}
 
+      {/* Manual attendance marking — staff, fallback when the fingerprint
+          scanner is unavailable. */}
+      {role === "staff" && (
+        <Card className="space-y-3">
+          <SectionHeading
+            title="Mark attendance manually"
+            description={`Use this when the fingerprint scanner isn't working. Records today's status for your ${people.length} mentee${people.length === 1 ? "" : "s"}.`}
+          />
+          {markError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{markError}</p>}
+          {people.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No mentees assigned to you.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {people.map((p) => {
+                const current = todayStatusMap.get(p.id)
+                return (
+                  <li key={p.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{p.name}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{p.id}</p>
+                    </div>
+                    {current && (
+                      <span className="pill bg-primary/10 text-primary capitalize">
+                        {current === "on-time" ? "present" : current}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleManualMark(p.id, "present")}
+                        disabled={markingId === p.id || current === "on-time"}
+                        className="rounded-sm border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+                      >
+                        Present
+                      </button>
+                      <button
+                        onClick={() => handleManualMark(p.id, "late")}
+                        disabled={markingId === p.id || current === "late"}
+                        className="rounded-sm border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-warning/40 hover:bg-warning/10 hover:text-warning disabled:opacity-40"
+                      >
+                        Late
+                      </button>
+                      <button
+                        onClick={() => handleManualMark(p.id, "absent")}
+                        disabled={markingId === p.id || current === "absent"}
+                        className="rounded-sm border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                      >
+                        Absent
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      )}
+
       {/* Date picker for daily log */}
       <Card>
         <div className="flex flex-wrap items-center gap-3">
@@ -390,36 +502,54 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3">
           {role !== "student" && (
-            <div className="space-y-1.5">
+            <div className="relative space-y-1.5">
               <label htmlFor="hist-person" className="text-xs font-medium text-muted-foreground">Person</label>
-              <select
+              <input
                 id="hist-person"
-                value={personId}
-                onChange={(e) => selectPerson(e.target.value)}
+                type="text"
+                value={personId ? (selectedPerson?.name ?? "") : personQuery}
+                onChange={(e) => {
+                  setPersonId("")
+                  setPersonQuery(e.target.value)
+                }}
+                onFocus={() => setPersonQuery("")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    if (filteredPeople.length === 1) {
+                      selectPerson(filteredPeople[0].id)
+                    } else if (filteredPeople.length > 0) {
+                      selectPerson(filteredPeople[0].id)
+                    } else if (personQuery.trim()) {
+                      doFetchHistory()
+                    }
+                  }
+                }}
+                placeholder={role === "staff" ? "Search mentees…" : "Search people…"}
                 className={cn(inputCls, "min-w-44")}
-              >
-                <option value="">
-                  {role === "staff" ? "All my mentees" : "Everyone"}
-                </option>
-                {role === "admin" ? (
-                  <>
-                    <optgroup label="Students">
-                      {people.filter((p) => p.role === "student").map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Staff">
-                      {people.filter((p) => p.role !== "student").map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </optgroup>
-                  </>
-                ) : (
-                  people.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))
-                )}
-              </select>
+              />
+              {(personId || personQuery.trim()) && (
+                <button
+                  onClick={() => { setPersonId(""); setPersonQuery(""); selectPerson("") }}
+                  className="absolute right-2 top-7 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ×
+                </button>
+              )}
+              {!personId && personQuery.trim() && filteredPeople.length > 0 && (
+                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-sm border border-border bg-card shadow-sm">
+                  {filteredPeople.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setPersonQuery(""); selectPerson(p.id) }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary"
+                    >
+                      <span className="truncate">{p.name}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">{p.role}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <div className="space-y-1.5">

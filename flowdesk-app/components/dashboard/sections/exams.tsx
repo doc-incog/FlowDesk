@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CalendarDays, Check, Clock, Download, MapPin, Plus, Trash2, TrendingUp } from "lucide-react"
+import { CalendarDays, Check, Clock, Download, MapPin, Plus, Search, Trash2, TrendingUp } from "lucide-react"
 import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -418,27 +418,72 @@ function ReportCardView({ student, exams, results }: { student: UserProfile; exa
 }
 
 function AllResults({ exams, results, students }: { exams: Exam[]; results: ResultRow[]; students: UserProfile[] }) {
-  const [studentId, setStudentId] = useState(students[0]?.id ?? "")
-  const student = students.find((s) => s.id === studentId) ?? students[0]
+  const [query, setQuery] = useState("")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const filtered = query.trim()
+    ? students.filter(
+        (s) =>
+          s.name.toLowerCase().includes(query.toLowerCase()) ||
+          (s.rollNo ?? "").toLowerCase().includes(query.toLowerCase()) ||
+          s.id.toLowerCase().includes(query.toLowerCase()),
+      )
+    : students
+
+  const student = selectedId ? students.find((s) => s.id === selectedId) : null
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor="exam-student" className="text-sm font-medium">Student:</label>
-        <select
-          id="exam-student"
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
-          className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
-        >
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} · {s.rollNo}
-            </option>
-          ))}
-        </select>
+      <div className="max-w-md space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setSelectedId(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered.length > 0) {
+                e.preventDefault()
+                const first = filtered[0]
+                setSelectedId(first.id)
+                setQuery(first.name)
+              }
+            }}
+            placeholder="Search by name, roll number or ID…"
+            aria-label="Search students"
+            className="w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+        {query.trim() && !selectedId && filtered.length > 0 && (
+          <div className="max-h-48 overflow-y-auto rounded-sm border border-border bg-card">
+            {filtered.slice(0, 10).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  setSelectedId(s.id)
+                  setQuery(s.name)
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-secondary"
+              >
+                <span className="truncate font-medium">{s.name}</span>
+                <span className="truncate font-mono text-xs text-muted-foreground">{s.rollNo}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {query.trim() && !selectedId && filtered.length === 0 && (
+          <p className="text-xs text-muted-foreground">No students found.</p>
+        )}
       </div>
       {student && <ReportCardView student={student} exams={exams} results={results} />}
+      {!student && (
+        <Card className="py-12 text-center text-sm text-muted-foreground">
+          Search for a student to view their results.
+        </Card>
+      )}
     </div>
   )
 }
@@ -455,11 +500,20 @@ function MarkEntry({
   students: UserProfile[]
 }) {
   const [examId, setExamId] = useState(exams[0]?.id ?? "")
+  const [semesterFilter, setSemesterFilter] = useState<string>("all")
   const [marks, setMarks] = useState<Record<string, number | "">>({})
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const exam = exams.find((e) => e.id === examId)
+
+  // Get unique semesters from students
+  const semesters = Array.from(new Set(students.map((s) => s.semester).filter(Boolean))).sort()
+
+  // Filter students by semester
+  const filteredStudents = semesterFilter === "all"
+    ? students
+    : students.filter((s) => s.semester === semesterFilter)
 
   // Marks already saved for this exam pre-fill the grid; `marks` holds only
   // unsaved local edits on top of them.
@@ -533,6 +587,26 @@ function MarkEntry({
           ))}
         </select>
         {exam && <span className="text-sm text-muted-foreground">Max {exam.maxMarks} marks</span>}
+        {semesters.length > 0 && (
+          <>
+            <label htmlFor="semester-filter" className="ml-4 text-sm font-medium">Semester:</label>
+            <select
+              id="semester-filter"
+              value={semesterFilter}
+              onChange={(e) => {
+                setSemesterFilter(e.target.value)
+                setMarks({})
+                setSaved(false)
+              }}
+              className="rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+            >
+              <option value="all">All semesters</option>
+              {semesters.map((s) => (
+                <option key={s} value={s}>Semester {s}</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       <Card className="overflow-x-auto">
@@ -546,7 +620,7 @@ function MarkEntry({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {students.map((s) => {
+            {filteredStudents.map((s) => {
               const m = valueFor(s.id)
               const numeric = m === "" ? 0 : Number(m)
               const pct = exam ? percentage(numeric, exam.maxMarks) : 0

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { unlinkSync, existsSync } from "node:fs"
 import { getSessionUser } from "@/lib/auth"
 import { findUserById, getDb, mapUser } from "@/lib/db"
 
@@ -48,6 +49,13 @@ export async function PATCH(
       ? JSON.stringify(body.subjects.map((s) => String(s).trim()).filter(Boolean))
       : existing.subjects
 
+  // An explicit empty mentorId means "clear the assignment" (write NULL),
+  // otherwise fall back to the current value when the field is untouched.
+  const mentorId =
+    Object.prototype.hasOwnProperty.call(body, "mentorId") && String(body.mentorId).trim() === ""
+      ? null
+      : str(body.mentorId) ?? existing.mentor_id
+
   try {
     db.prepare(
       `UPDATE users SET
@@ -65,7 +73,7 @@ export async function PATCH(
       str(body.batch) ?? existing.batch,
       str(body.semester) ?? existing.semester,
       str(body.rollNo) ?? existing.roll_no,
-      str(body.mentorId) ?? existing.mentor_id,
+      mentorId,
       str(body.designation) ?? existing.designation,
       subjects,
       str(body.phone) ?? existing.phone,
@@ -87,7 +95,11 @@ export async function PATCH(
   return NextResponse.json({ ok: true, person: row ? mapUser(row) : null })
 }
 
-/** Permanently removes a student or staff member and their live data (admin only). */
+/** Soft-deletes a student/staff member and purges their live data (admin only).
+ *  The user row is kept (flagged is_deleted) so historical chat threads,
+ *  financial/result audit records and the directory remain intact, but the
+ *  person is hidden from every listing, cannot log in, cannot be messaged,
+ *  and their PII is blanked out. */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -107,36 +119,69 @@ export async function DELETE(
   if (existing.role === "admin") {
     return NextResponse.json({ error: "Admin accounts cannot be deleted" }, { status: 403 })
   }
+  if (existing.is_deleted) {
+    return NextResponse.json({ error: "Person already deleted" }, { status: 409 })
+  }
 
-  // Chat data: direct conversations involving the deleted person are removed
-  // for everyone (otherwise they linger as "Unknown user" entries); group
-  // chats keep running without them.
-  db.prepare("DELETE FROM messages WHERE sender_id = ?").run(id)
-  db.prepare(
-    `DELETE FROM messages WHERE conversation_id IN (
-      SELECT c.id FROM conversations c
-      JOIN conversation_participants cp ON cp.conversation_id = c.id
-      WHERE cp.user_id = ? AND c.type = 'direct'
-    )`,
-  ).run(id)
-  db.prepare(
-    `DELETE FROM conversations WHERE id IN (
-      SELECT c.id FROM conversations c
-      JOIN conversation_participants cp ON cp.conversation_id = c.id
-      WHERE cp.user_id = ? AND c.type = 'direct'
-    )`,
-  ).run(id)
-  db.prepare("DELETE FROM conversation_participants WHERE user_id = ?").run(id)
-
-  // Live account data: sessions, attendance, notifications and per-user
-  // permission overrides. Historical records (fees paid, results,
-  // submissions) are intentionally preserved for audit.
+  // Live account data that must not linger: sessions (log the person out),
+  // notifications, per-user permission overrides, and their submitted work.
+  // Chat threads (conversations + messages) are intentionally KEPT so the
+  // other party's history stays readable with "Unknown User". Financial and
+  // result audit records (fees paid, receipts, results) are also preserved.
   db.prepare("DELETE FROM sessions WHERE user_id = ?").run(id)
-  db.prepare("DELETE FROM check_ins WHERE user_id = ?").run(id)
   db.prepare("DELETE FROM notifications WHERE user_id = ?").run(id)
   db.prepare("DELETE FROM user_permissions WHERE user_id = ?").run(id)
 
-  db.prepare("DELETE FROM users WHERE id = ?").run(id)
+  // Assignment submissions: also remove the uploaded files from disk
+  const submissions = db
+    .prepare("SELECT file_path FROM submissions WHERE student_id = ?")
+    .all(id) as { file_path: string | null }[]
+  for (const sub of submissions) {
+    if (sub.file_path && existsSync(sub.file_path)) {
+      try {
+        unlinkSync(sub.file_path)
+      } catch {
+        // Best-effort: leave orphan file if it cannot be removed
+      }
+    }
+  }
+  db.prepare("DELETE FROM submissions WHERE student_id = ?").run(id)
+
+  // User-generated content the person created as a student/staff member
+  db.prepare("DELETE FROM complaints WHERE raised_by_id = ?").run(id)
+  db.prepare("DELETE FROM feedback_entries WHERE by_id = ?").run(id)
+  db.prepare("DELETE FROM scholarship_applications WHERE student_id = ?").run(id)
+
+  // Remove attendance check-ins (live operational data)
+  db.prepare("DELETE FROM check_ins WHERE user_id = ?").run(id)
+
+  // Clear any mentor references pointing at the deleted person
+  db.prepare("UPDATE users SET mentor_id = NULL WHERE mentor_id = ?").run(id)
+  db.prepare("DELETE FROM mentors WHERE id = ?").run(id)
+
+  // Soft-delete: flag the row, blank PII, keep the id for chat/audit refs.
+  db.prepare(
+    `UPDATE users SET
+       is_deleted = 1,
+       name = 'Unknown User',
+       email = ?,
+       avatar_initials = '?',
+       department = '',
+       batch = NULL,
+       semester = NULL,
+       roll_no = NULL,
+       mentor_id = NULL,
+       designation = NULL,
+       subjects = NULL,
+       phone = NULL,
+       address = NULL,
+       guardian_name = NULL,
+       guardian_phone = NULL,
+       emergency_contact = NULL,
+       dob = NULL,
+       password_hash = ''
+     WHERE id = ?`,
+  ).run(`deleted+${id.toLowerCase()}@flowdesk.local`, id)
 
   return NextResponse.json({ ok: true })
 }

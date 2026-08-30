@@ -36,6 +36,19 @@ type Filter = "all" | string
 const inputCls =
   "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
 
+// Predefined feedback categories shown to admins when creating forms. A custom
+// category can still be typed by choosing "custom".
+const FEEDBACK_CATEGORIES = [
+  "teacher",
+  "event",
+  "course",
+  "facility",
+  "transport",
+  "canteen",
+  "library",
+  "general",
+]
+
 export function FeedbackSection({ role }: { role: Role }) {
   const [entries, setEntries] = useState<FeedbackEntry[] | null>(null)
   const [targets, setTargets] = useState<FeedbackTarget[]>([])
@@ -50,6 +63,7 @@ export function FeedbackSection({ role }: { role: Role }) {
 
   // Admin: create / manage feedback forms
   const [form, setForm] = useState({ type: "event", name: "", subtitle: "" })
+  const [customType, setCustomType] = useState(false)
   const [creatingForm, setCreatingForm] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
@@ -141,6 +155,7 @@ export function FeedbackSection({ role }: { role: Role }) {
       }
       setTargets((prev) => [...prev, data.target])
       setForm({ type: form.type, name: "", subtitle: "" })
+      setCustomType(false)
     } catch {
       setFormError("Network error while creating the form.")
     } finally {
@@ -196,19 +211,35 @@ export function FeedbackSection({ role }: { role: Role }) {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="fb-form-type" className="text-sm font-medium">Category</label>
-              <input
+              <select
                 id="fb-form-type"
                 className={inputCls}
-                list="fb-form-type-options"
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                placeholder="event"
-              />
-              <datalist id="fb-form-type-options">
-                {["teacher", "event", ...knownTypes.filter((t) => t !== "teacher" && t !== "event")].map((t) => (
-                  <option key={t} value={t} />
+                value={customType ? "custom" : form.type}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === "custom") {
+                    setCustomType(true)
+                    setForm((f) => ({ ...f, type: "" }))
+                  } else {
+                    setCustomType(false)
+                    setForm((f) => ({ ...f, type: v }))
+                  }
+                }}
+              >
+                {FEEDBACK_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
-              </datalist>
+                <option value="custom">Custom…</option>
+              </select>
+              {customType && (
+                <input
+                  id="fb-form-type-custom"
+                  className={inputCls}
+                  value={form.type}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                  placeholder="e.g. hostel"
+                />
+              )}
             </div>
             <div className="space-y-1.5">
               <label htmlFor="fb-form-subtitle" className="text-sm font-medium">Short note</label>

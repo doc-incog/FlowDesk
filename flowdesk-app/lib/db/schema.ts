@@ -20,7 +20,8 @@ export const USERS_TABLE_DDL = `(
   guardian_name TEXT,
   guardian_phone TEXT,
   emergency_contact TEXT,
-  dob TEXT
+  dob TEXT,
+  is_deleted INTEGER NOT NULL DEFAULT 0
 )`
 
 export function createSchema(db: DatabaseSync) {
@@ -77,9 +78,17 @@ export function createSchema(db: DatabaseSync) {
       category TEXT NOT NULL,
       unread INTEGER NOT NULL DEFAULT 1,
       user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      target_role TEXT
+      target_role TEXT,
+      created_at TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+
+    CREATE TABLE IF NOT EXISTS notification_reads (
+      notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      read_at TEXT NOT NULL,
+      PRIMARY KEY (notification_id, user_id)
+    );
 
     CREATE TABLE IF NOT EXISTS schedule_slots (
       id TEXT PRIMARY KEY,
@@ -275,6 +284,7 @@ export function createSchema(db: DatabaseSync) {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       joined_at TEXT NOT NULL,
       last_read_at TEXT,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (conversation_id, user_id)
     );
 

@@ -23,9 +23,15 @@ export async function GET() {
     max_marks: number
   }[]
 
+  // Staff/admin see all submissions; students see only their own.
+  const isStaffOrAdmin = user.role === "admin" || user.role === "staff"
   const submissionRows = db
-    .prepare("SELECT id, assignment_id, student_id, student_name, submitted_at, file_name, marks, feedback FROM submissions WHERE student_id = ?")
-    .all(user.id) as {
+    .prepare(
+      isStaffOrAdmin
+        ? "SELECT id, assignment_id, student_id, student_name, submitted_at, file_name, marks, feedback FROM submissions"
+        : "SELECT id, assignment_id, student_id, student_name, submitted_at, file_name, marks, feedback FROM submissions WHERE student_id = ?",
+    )
+    .all(...(isStaffOrAdmin ? [] : [user.id])) as {
     id: string
     assignment_id: string
     student_id: string
@@ -47,7 +53,8 @@ export async function GET() {
     feedback: s.feedback,
   }))
 
-  const byAssignment = new Map(submissions.map((s) => [s.assignmentId, s]))
+  // For students, map assignment to their single submission; for staff/admin, submissions are separate.
+  const mySubmission = new Map(submissions.filter((s) => s.studentId === user.id).map((s) => [s.assignmentId, s]))
 
   const assignments = assignmentRows.map((a) => ({
     id: a.id,
@@ -58,7 +65,7 @@ export async function GET() {
     assignedDate: a.assigned_date,
     dueDate: a.due_date,
     maxMarks: a.max_marks,
-    submission: byAssignment.get(a.id),
+    submission: mySubmission.get(a.id),
   }))
 
   return NextResponse.json({ assignments, submissions })

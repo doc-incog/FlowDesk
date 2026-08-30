@@ -27,6 +27,7 @@ export type UserRow = {
   guardian_phone: string | null
   emergency_contact: string | null
   dob: string | null
+  is_deleted: number
 }
 
 declare global {
@@ -99,6 +100,7 @@ export function migrateDatabase(db: DatabaseSync) {
   addColumn("guardian_phone TEXT")
   addColumn("emergency_contact TEXT")
   addColumn("dob TEXT")
+  addColumn("is_deleted INTEGER NOT NULL DEFAULT 0")
 
   // feedback_targets: drop the old CHECK (type IN ('teacher','event')) so
   // admins can create forms with any category.
@@ -134,6 +136,43 @@ export function migrateDatabase(db: DatabaseSync) {
     db.exec("ALTER TABLE notifications ADD COLUMN target_role TEXT")
   } catch {
     // column already exists
+  }
+
+  // notifications: created_at for real timestamps (replaces static "Just now")
+  try {
+    db.exec("ALTER TABLE notifications ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+  } catch {
+    // column already exists
+  }
+
+  // notification_reads: per-user read tracking so role switches preserve unread state
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS notification_reads (
+        notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        read_at TEXT NOT NULL,
+        PRIMARY KEY (notification_id, user_id)
+      )
+    `)
+  } catch {
+    // table already exists
+  }
+
+  // conversation_participants: per-user soft-hide for conversations
+  try {
+    db.exec("ALTER TABLE conversation_participants ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0")
+  } catch {
+    // column already exists
+  }
+
+  // Grant the admin role access to the 'mentees' management section. The seed
+  // is insert-once, so pre-existing databases will not have this row until it
+  // is added here. Idempotent.
+  try {
+    db.exec("INSERT OR IGNORE INTO role_permissions (role, section) VALUES ('admin', 'mentees')")
+  } catch {
+    // role_permissions table may not exist on very old databases
   }
 
   // Data fix: the scholarship section now displays NPR ("Rs.") instead of INR
@@ -184,15 +223,16 @@ export function mapUser(row: UserRow) {
     guardianPhone: row.guardian_phone ?? undefined,
     emergencyContact: row.emergency_contact ?? undefined,
     dob: row.dob ?? undefined,
+    isDeleted: row.is_deleted === 1,
   }
 }
 
 export function findUserByEmail(email: string): UserRow | undefined {
-  const row = getDb().prepare("SELECT * FROM users WHERE lower(email) = lower(?)").get(email) as UserRow | undefined
+  const row = getDb().prepare("SELECT * FROM users WHERE lower(email) = lower(?) AND is_deleted = 0").get(email) as UserRow | undefined
   return row
 }
 
 export function findUserById(id: string): UserRow | undefined {
-  const row = getDb().prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined
+  const row = getDb().prepare("SELECT * FROM users WHERE id = ? AND is_deleted = 0").get(id) as UserRow | undefined
   return row
 }

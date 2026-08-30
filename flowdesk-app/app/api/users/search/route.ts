@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     .prepare(`
       SELECT id, name, avatar_initials, role, department
       FROM users
-      WHERE id != ? AND (name LIKE ? OR email LIKE ? OR id LIKE ?)
+      WHERE id != ? AND is_deleted = 0 AND (name LIKE ? OR email LIKE ? OR id LIKE ?)
       ORDER BY name
       LIMIT 20
     `)

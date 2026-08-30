@@ -33,7 +33,7 @@ export async function GET() {
 
   const roles = rows.map((r) => {
     const count = (
-      db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ?").get(r.key) as { n: number }
+      db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = ? AND is_deleted = 0").get(r.key) as { n: number }
     ).n
     return { ...r, builtin: r.builtin === 1, sections: roleSections(db, r.key), users: count }
   })
