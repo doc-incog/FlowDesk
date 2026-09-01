@@ -1,0 +1,45 @@
+[package]
+name = "flowdesk-backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8.9", features = ["macros", "multipart", "json"] }
+tokio = { version = "1.53.1", features = ["full"] }
+mongodb = "2.8.2"
+
+# Async MongoDB driver (tokio runtime) for Axum handlers; supports transactions for fee flows.
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+
+# Password hashing (scrypt, matching the existing Node scrypt salt:hash scheme)
+scrypt = { version = "0.11", features = ["simple"] }
+uuid = { version = "1", features = ["v4"] }
+
+# JWT for mobile + device bearer auth
+jsonwebtoken = "11.0.0"
+base64 = "0.23.1"
+sha2 = "0.11.0"
+hmac = "0.13.0"
+
+# SSE / streaming
+tokio-stream = "0.1"
+futures = "0.3"
+
+# HTTP client used by nothing server-side yet; IoT uses python-requests. Kept out of runtime.
+
+# Misc
+thiserror = "2.0.20"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+dotenvy = "0.15"
+tower = "0.5"
+tower-http = { version = "0.7.1", features = ["cors", "trace", "timeout"] }
+
+# Date/time & NPR-style formatting
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4.3"
+rand = "0.8"
+
+[profile.release]
+opt-level = 2
