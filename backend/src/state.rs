@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub cfg: Arc<Config>,
+    pub client: Client,
     pub db: Database,
     /// In-process SSE event bus keyed by fingerprint deviceId.
     pub sse: SseBus,
@@ -19,6 +20,7 @@ impl AppState {
         let db = client.database(&cfg.mongodb_db);
         Ok(AppState {
             cfg: Arc::new(cfg),
+            client,
             db,
             sse: SseBus::new(),
         })

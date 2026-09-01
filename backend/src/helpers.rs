@@ -149,3 +149,32 @@ pub async fn with_permissions_doc(state: &AppState, user_doc: &Document) -> Valu
     }
     base
 }
+
+/// IDs of all students whose mentor is the given staff member, matched either by
+/// the roster `mentors.name` equal to the teacher's name, or by `users.mentor_id`.
+pub async fn mentee_ids(state: &AppState, staff_id: &str) -> Result<Vec<String>, mongodb::error::Error> {
+    let users = state.db.collection::<Document>("users");
+    let mentor = users.find_one(doc! { "_id": staff_id }, None).await?;
+    let name = mentor.and_then(|m| m.get_str("name").ok().map(|s| s.to_string())).unwrap_or_default();
+
+    let filter = if name.is_empty() {
+        doc! { "role": "student", "is_deleted": false, "mentor_id": staff_id }
+    } else {
+        doc! {
+            "role": "student", "is_deleted": false,
+            "$or": [
+                { "mentor_id": staff_id },
+                { "mentor": &name },
+                { "mentor_id": &name },
+            ]
+        }
+    };
+    let mut cursor = users.find(filter, None).await?;
+    let mut out = Vec::new();
+    while let Some(u) = cursor.try_next().await? {
+        if let Some(id) = u.get_str("_id").ok() {
+            out.push(id.to_string());
+        }
+    }
+    Ok(out)
+}
