@@ -1,0 +1,15 @@
+# Netlify configuration for the migrated FlowDesk deployment.
+# Builds the Next.js frontend (flowdesk-app) with the Netlify Next.js runtime.
+[build]
+  base = "flowdesk-app"
+  command = "next build --webpack"
+  publish = ".next"
+
+# Use the Netlify Next.js runtime so /api handlers, middleware (proxy.ts) and
+# pdfkit SSR routes run in serverless functions on the Node runtime.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_PUBLIC_SITE_URL = "${SITE_URL}"
