@@ -120,7 +120,14 @@ The script:
 
 ---
 
-## 5. Verification checklist (post-seed)
+## 5. Known out-of-scope / deferred items
+
+- `POST /api/exams/report-card` (PDF stream) — depends on a PDF-generation library.
+  The migration ports the data + `POST /api/exams/results` api, but the PDF rendering
+  endpoint is deferred to a follow-up (no PDF crate added yet). All other contract
+  endpoints are ported.
+
+## 6. Verification checklist (post-seed)
 
 - [ ] 32 collections created with string `_id`.
 - [ ] `users` row count equals snapshot (9) and all scrypt hashes verify.

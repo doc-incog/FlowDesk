@@ -113,7 +113,7 @@ Deletes a feedback form and all of its entries. Admin only. → `{ "ok": true }`
 ## Payments
 
 ### `POST /api/fees/:id/pay`
-Requires a student session. Body: `{ "method": "upi" | "card" | "netbanking" | "cash" }`
+Requires a student session. Body: `{ "method": "ewallet" | "card" | "netbanking" | "cash" }`
 
 Marks the fee item paid and creates a receipt. Idempotent — paying an already
 paid fee returns the existing receipt with `alreadyPaid: true`.
