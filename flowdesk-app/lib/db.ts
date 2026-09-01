@@ -240,6 +240,101 @@ export function migrateDatabase(db: DatabaseSync) {
   } catch {
     // mentors/users tables may not exist on very old databases
   }
+
+  // Backfill mentor roster rows for active staff who lack one. Mentors are
+  // linked to staff by name (/api/mentees, /api/directory, /api/mentor), so a
+  // staff member without a `mentors` row can never be assigned students. This
+  // covers staff created before the roster row was auto-created on insert.
+  try {
+    const rows = db
+      .prepare(
+        `SELECT id, name, email, avatar_initials, department, designation, phone
+         FROM users
+         WHERE role = 'staff' AND is_deleted = 0
+           AND name NOT IN (SELECT name FROM mentors)`,
+      )
+      .all() as {
+      id: string
+      name: string
+      email: string
+      avatar_initials: string
+      department: string | null
+      designation: string | null
+      phone: string | null
+    }[]
+    let next = nextPrefixId(db, "mentors", "MEN-")
+    for (const r of rows) {
+      db.prepare(
+        `INSERT INTO mentors (id, name, designation, department, email, phone, office, office_hours, avatar_initials, mentees)
+         VALUES (?, ?, ?, ?, ?, ?, '', '', ?, 0)`,
+      ).run(
+        next,
+        r.name,
+        r.designation ?? "",
+        r.department ?? "",
+        r.email ?? "",
+        r.phone ?? "",
+        r.avatar_initials || next.slice(-2),
+      )
+      next = nextPrefixId(db, "mentors", "MEN-")
+    }
+  } catch {
+    // mentors/users tables may not exist on very old databases
+  }
+
+  // Scholarship application statuses: add 'withdrawn' so students can retract a
+  // pending application. SQLite cannot ALTER a CHECK constraint, so rebuild the
+  // table only when the current DDL does not already allow 'withdrawn'.
+  try {
+    const row = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'scholarship_applications'")
+      .get() as { sql: string } | undefined
+    if (row && !/withdrawn/i.test(row.sql)) {
+      db.exec("PRAGMA foreign_keys = OFF")
+      db.exec("BEGIN")
+      try {
+        db.exec(`
+          CREATE TABLE scholarship_applications_v2 (
+            id TEXT PRIMARY KEY,
+            scholarship_id TEXT NOT NULL,
+            student_id TEXT NOT NULL,
+            student_name TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('submitted','under-review','approved','rejected','withdrawn')),
+            submitted_at TEXT NOT NULL,
+            docs TEXT NOT NULL
+          )
+        `)
+        db.exec(`
+          INSERT INTO scholarship_applications_v2 (id, scholarship_id, student_id, student_name, status, submitted_at, docs)
+          SELECT id, scholarship_id, student_id, student_name, status, submitted_at, docs FROM scholarship_applications
+        `)
+        db.exec("DROP TABLE scholarship_applications")
+        db.exec("ALTER TABLE scholarship_applications_v2 RENAME TO scholarship_applications")
+        db.exec("CREATE INDEX IF NOT EXISTS idx_scholar_student ON scholarship_applications(student_id)")
+        db.exec("COMMIT")
+      } catch (err) {
+        db.exec("ROLLBACK")
+        throw err
+      } finally {
+        db.exec("PRAGMA foreign_keys = ON")
+      }
+    }
+  } catch {
+    // valid databases simply skip the rebuild
+  }
+}
+
+/** Generates the next sequential id for a prefix inside a table (e.g. "MEN-"). */
+export function nextPrefixId(db: ReturnType<typeof getDb>, table: string, prefix: string): string {
+  const rows = db
+    .prepare(`SELECT id FROM ${table} WHERE id LIKE ?`)
+    .all(`${prefix}%`) as { id: string }[]
+  let max = 0
+  for (const r of rows) {
+    const n = Number(r.id.slice(prefix.length))
+    if (Number.isFinite(n) && n > max) max = n
+  }
+  return `${prefix}${String(max + 1).padStart(4, "0")}`
 }
 
 export function closeDb() {

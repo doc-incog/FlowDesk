@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
-import { getDb, mapUser } from "@/lib/db"
+import { getDb, mapUser, nextPrefixId } from "@/lib/db"
 import { hashPassword } from "@/lib/db/password"
 import { DEFAULT_PASSWORD } from "@/lib/constants"
 
 export const runtime = "nodejs"
-
-function nextUserId(db: ReturnType<typeof getDb>, prefix: string): string {
-  const rows = db.prepare("SELECT id FROM users WHERE id LIKE ?").all(`${prefix}%`) as { id: string }[]
-  let max = 0
-  for (const r of rows) {
-    const n = Number(r.id.slice(prefix.length))
-    if (Number.isFinite(n) && n > max) max = n
-  }
-  return `${prefix}${String(max + 1).padStart(4, "0")}`
-}
 
 export async function GET() {
   const user = await getSessionUser()
@@ -106,7 +96,7 @@ export async function POST(request: Request) {
   if (exists) return NextResponse.json({ error: "That email is already in use" }, { status: 409 })
 
   const prefix = kind === "staff" ? "STF-" : "STU-"
-  const id = nextUserId(db, prefix)
+  const id = nextPrefixId(db, "users", prefix)
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -149,6 +139,29 @@ export async function POST(request: Request) {
       ? "That email is already in use."
       : "Could not add the person."
     return NextResponse.json({ error: message }, { status: 409 })
+  }
+
+  // Staff become mentors too: create their roster row so they can be assigned
+  // students in Mentees and show up in the student mentor dropdown. Mentors are
+  // linked to staff accounts by name, so this must stay in sync.
+  if (role === "staff") {
+    const mentorId = nextPrefixId(db, "mentors", "MEN-")
+    try {
+      db.prepare(
+        `INSERT INTO mentors (id, name, designation, department, email, phone, office, office_hours, avatar_initials, mentees)
+         VALUES (?, ?, ?, ?, ?, ?, '', '', ?, 0)`,
+      ).run(
+        mentorId,
+        name,
+        str(body.designation) ?? "",
+        str(body.department) ?? "",
+        email.toLowerCase(),
+        str(body.phone) ?? "",
+        initials,
+      )
+    } catch {
+      // A roster row may already exist for this staff name; not worth failing the add.
+    }
   }
 
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as Parameters<typeof mapUser>[0]

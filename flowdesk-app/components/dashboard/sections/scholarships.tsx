@@ -20,7 +20,7 @@ type Scholarship = {
   description: string
 }
 
-type ScholarshipStatus = "submitted" | "under-review" | "approved" | "rejected"
+type ScholarshipStatus = "submitted" | "under-review" | "approved" | "rejected" | "withdrawn"
 
 // A supporting document is either a plain label (seed data) or an uploaded
 // file with { name, path } metadata (real applications).
@@ -102,6 +102,7 @@ const STATUS_BADGE: Record<ScholarshipStatus, string> = {
   "under-review": "pill bg-warning/15 text-warning",
   approved: "pill bg-success/10 text-success",
   rejected: "pill bg-destructive/10 text-destructive",
+  withdrawn: "pill bg-muted text-muted-foreground",
 }
 
 const STATUS_LABEL: Record<ScholarshipStatus, string> = {
@@ -109,6 +110,7 @@ const STATUS_LABEL: Record<ScholarshipStatus, string> = {
   "under-review": "Under review",
   approved: "Approved",
   rejected: "Rejected",
+  withdrawn: "Withdrawn",
 }
 
 export function ScholarshipsSection({ role }: { role: Role }) {
@@ -213,7 +215,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
           </div>
         )
       ) : (
-        <StudentApplications applications={applications} scholarships={scholarships} me={me} />
+        <StudentApplications applications={applications} setApplications={setApplications} scholarships={scholarships} me={me} />
       )}
       {!isStudent && (
         <p className="text-sm text-muted-foreground">
@@ -326,14 +328,17 @@ function ScholarshipCard({ s, canApply, onApply }: { s: Scholarship; canApply: b
 
 function StudentApplications({
   applications,
+  setApplications,
   scholarships,
   me,
 }: {
   applications: ScholarshipApplication[]
+  setApplications: React.Dispatch<React.SetStateAction<ScholarshipApplication[]>>
   scholarships: Scholarship[]
   me: UserProfile
 }) {
   const mine = applications.filter((a) => a.studentId === me.id)
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null)
 
   if (mine.length === 0) {
     return (
@@ -343,10 +348,29 @@ function StudentApplications({
     )
   }
 
+  const withdraw = async (id: string) => {
+    setWithdrawingId(id)
+    try {
+      const res = await fetch(`/api/scholarships/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "withdrawn" }),
+      })
+      if (res.ok) {
+        setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status: "withdrawn" as const } : a)))
+      }
+    } catch {
+      // Status refreshes on next visit
+    } finally {
+      setWithdrawingId(null)
+    }
+  }
+
   return (
     <div className="space-y-3">
       {mine.map((a) => {
         const s = scholarships.find((x) => x.id === a.scholarshipId)
+        const canWithdraw = a.status === "submitted" || a.status === "under-review"
         return (
           <Card key={a.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
@@ -358,6 +382,15 @@ function StudentApplications({
             <span className={cn("self-start", STATUS_BADGE[a.status])}>
               {STATUS_LABEL[a.status]}
             </span>
+            {canWithdraw && (
+              <button
+                onClick={() => { if (window.confirm("Withdraw this application?")) withdraw(a.id) }}
+                disabled={withdrawingId === a.id}
+                className="self-start rounded-sm border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-40"
+              >
+                {withdrawingId === a.id ? "Withdrawing…" : "Withdraw"}
+              </button>
+            )}
           </Card>
         )
       })}
@@ -471,7 +504,7 @@ function AdminScholarships({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["all", "submitted", "under-review", "approved", "rejected"] as const).map((f) => (
+        {(["all", "submitted", "under-review", "approved", "rejected", "withdrawn"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -509,14 +542,14 @@ function AdminScholarships({
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => setStatus(a.id, "approved")}
-                  disabled={a.status === "approved"}
+                  disabled={a.status === "approved" || a.status === "withdrawn"}
                   className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   <CheckCircle2 className="h-4 w-4" aria-hidden /> Approve
                 </button>
                 <button
                   onClick={() => setStatus(a.id, "rejected")}
-                  disabled={a.status === "rejected"}
+                  disabled={a.status === "rejected" || a.status === "withdrawn"}
                   className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
                 >
                   <XCircle className="h-4 w-4" aria-hidden /> Reject

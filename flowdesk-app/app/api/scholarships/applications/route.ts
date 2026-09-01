@@ -29,7 +29,9 @@ export async function POST(request: Request) {
   if (!scholarship) return NextResponse.json({ error: "Scholarship not found" }, { status: 404 })
 
   const existing = db
-    .prepare("SELECT id FROM scholarship_applications WHERE scholarship_id = ? AND student_id = ?")
+    .prepare(
+      "SELECT id FROM scholarship_applications WHERE scholarship_id = ? AND student_id = ? AND status != 'withdrawn'",
+    )
     .get(scholarshipId, user.id) as { id: string } | undefined
   if (existing) {
     return NextResponse.json(

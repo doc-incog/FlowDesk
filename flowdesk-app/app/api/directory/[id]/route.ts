@@ -91,6 +91,12 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 409 })
   }
 
+  // Keep the mentors roster row in sync when a staff member's name changes,
+  // since mentees/directory/mentor routes JOIN mentors to staff by name.
+  if (existing.role === "staff" && name !== existing.name) {
+    db.prepare("UPDATE mentors SET name = ? WHERE name = ?").run(name, existing.name)
+  }
+
   const row = findUserById(id)
   return NextResponse.json({ ok: true, person: row ? mapUser(row) : null })
 }
