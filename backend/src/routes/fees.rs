@@ -1,10 +1,11 @@
 use crate::constants::FEE_METHODS;
 use crate::error::ApiError;
 use crate::middleware::auth;
+use crate::services::pdf;
 use crate::services::util as u;
 use crate::state::AppState;
 use axum::extract::{Path, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -16,6 +17,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/fees", get(list_fees))
         .route("/api/fees/{id}/pay", post(pay_fee))
+        .route("/api/receipts/{id}/pdf", get(receipt_pdf))
 }
 
 fn fee_to_value(d: &Document) -> Value {
@@ -206,4 +208,55 @@ async fn pay_fee(
         .unwrap_or_default();
 
     Ok(Json(json!({ "receipt": receipt_to_value(&inserted), "alreadyPaid": false })))
+}
+
+/// GET /api/receipts/{id}/pdf — stream a fee-payment receipt as PDF.
+async fn receipt_pdf(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApiError> {
+    let user = auth::require_session_user(&state, &headers).await?;
+
+    let receipts_coll = state.db.collection::<Document>("receipts");
+    let receipt = receipts_coll
+        .find_one(doc! { "_id": &id, "student_id": &user.id }, None)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Receipt not found"))?;
+
+    let fee_id = receipt.get_str("fee_id").unwrap_or("").to_string();
+    let mut item_name = fee_id.clone();
+    if !fee_id.is_empty() {
+        let fees_coll = state.db.collection::<Document>("fees");
+        if let Some(fee) = fees_coll.find_one(doc! { "_id": &fee_id }, None).await? {
+            if let Ok(name) = fee.get_str("name") {
+            item_name = name.to_string();
+        }
+        }
+    }
+
+    let spec = pdf::ReceiptSpec {
+        id: receipt.get_str("_id").unwrap_or(&id).to_string(),
+        student_name: receipt.get_str("student_name").unwrap_or("").to_string(),
+        student_id: receipt.get_str("student_id").unwrap_or("").to_string(),
+        item_name,
+        amount: receipt.get_f64("amount").unwrap_or(0.0),
+        method: receipt.get_str("method").unwrap_or("").to_string(),
+        transaction_id: receipt.get_str("txn_id").unwrap_or("").to_string(),
+        date: receipt.get_str("date").unwrap_or("").to_string(),
+    };
+    let bytes = pdf::receipt_pdf(&spec)?;
+
+    let mut headers_map = HeaderMap::new();
+    headers_map.insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    headers_map.insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"receipt-{}.pdf\"", spec.id))
+            .map_err(|_| ApiError::bad_request("bad filename"))?,
+    );
+
+    Ok((StatusCode::OK, headers_map, bytes))
 }

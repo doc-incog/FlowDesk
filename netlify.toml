@@ -5,11 +5,29 @@
   command = "next build --webpack"
   publish = ".next"
 
-# Use the Netlify Next.js runtime so /api handlers, middleware (proxy.ts) and
-# pdfkit SSR routes run in serverless functions on the Node runtime.
+# Use the Netlify Next.js runtime so SSR pages + middleware (proxy.ts) run.
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
   NEXT_PUBLIC_SITE_URL = "${SITE_URL}"
+
+# ---------------------------------------------------------------------------
+# Proxy the backend API to the migrated Rust (Axum) service on Render.
+#
+# The Next.js SQLite prototype handlers 500 in Netlify Functions, so all
+# /api/* traffic is forwarded to the Rust backend, which reads MongoDB Atlas.
+# Cookies (flowdesk.session) are set on this origin, so auth stays same-origin.
+#
+# TODO(deploy): replace <your-backend>.onrender.com with the real Render URL,
+# e.g. https://flowdesk-backend-XXXX.onrender.com. Then push to redeploy.
+#
+# The legacy Next.js /api/* handlers must NOT be deployed; keep the rewrite
+# with force=true so it wins over the Next.js runtime for /api/*.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/api/*"
+  to = "https://<your-backend>.onrender.com/api/:splat"
+  status = 200
+  force = true

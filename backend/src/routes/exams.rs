@@ -1,15 +1,17 @@
 use crate::error::ApiError;
 use crate::middleware::auth;
+use crate::services::pdf;
 use crate::services::util as u;
 use crate::state::AppState;
 use axum::extract::Path;
 use axum::extract::State;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use futures::TryStreamExt;
 use mongodb::bson::{doc, Bson, Document};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 pub fn router() -> Router<AppState> {
@@ -17,6 +19,77 @@ pub fn router() -> Router<AppState> {
         .route("/api/exams", get(list_exams).post(create_exam))
         .route("/api/exams/{id}", delete(delete_exam))
         .route("/api/exams/results", post(upsert_result))
+        .route("/api/exams/report-card", post(report_card))
+}
+
+#[derive(Deserialize)]
+struct ReportCardReq {
+    #[serde(rename = "studentName")]
+    student_name: String,
+    #[serde(rename = "studentId")]
+    student_id: String,
+    #[serde(rename = "rollNo")]
+    roll_no: Option<String>,
+    department: Option<String>,
+    semester: Option<String>,
+    rows: Vec<ReportCardRowReq>,
+    #[serde(rename = "totalMax")]
+    total_max: f64,
+    #[serde(rename = "totalMarks")]
+    total_marks: f64,
+    overall: f64,
+    grade: String,
+}
+
+#[derive(Deserialize)]
+struct ReportCardRowReq {
+    #[serde(rename = "moduleCode")]
+    module_code: String,
+    max: f64,
+    marks: f64,
+    grade: String,
+}
+
+/// POST /api/exams/report-card — generate a report-card PDF (primary in Rust).
+async fn report_card(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<ReportCardReq>,
+) -> Result<impl IntoResponse, ApiError> {
+    let user = auth::require_session_user(&state, &headers).await?;
+    let _ = user;
+
+    let rows: Vec<(String, f64, f64, String)> = body
+        .rows
+        .iter()
+        .map(|r| (r.module_code.clone(), r.max, r.marks, r.grade.clone()))
+        .collect();
+
+    let spec = pdf::ReportCardSpec {
+        student_name: body.student_name,
+        student_id: body.student_id,
+        semester: body.semester.unwrap_or_default(),
+        department: body.department.unwrap_or_default(),
+        rows,
+        total_max: body.total_max,
+        total_marks: body.total_marks,
+        overall: body.overall,
+        grade: body.grade,
+    };
+    let bytes = pdf::report_card_pdf(&spec)?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    headers.insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"report-card-{}.pdf\"", spec.student_id))
+            .map_err(|_| ApiError::bad_request("bad filename"))?,
+    );
+
+    Ok((StatusCode::OK, headers, bytes))
 }
 
 fn exam_value(e: &Document, result: Option<Value>) -> Value {

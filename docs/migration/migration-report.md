@@ -11,7 +11,15 @@
 
 - Every Mongo document uses a **string `_id`** (original sqlite `id` / `token` / `key` /
   `device_id`), not an ObjectId. The backend reads `get_str("_id")`.
-- Field names are converted **snake_case → camelCase** (e.g. `module_code` → `moduleCode`).
+- **Stored field names are snake_case**, equal to the sqlite column names. The Rust
+  backend reads Mongo documents by their snake_case field names everywhere
+  (`get_str("student_id")`, `doc! { "is_deleted": false }`, etc.), so the transform
+  preserves column names verbatim and only promotes the PK column to `_id`. The JSON
+  API serializes camelCase on output (`studentId`, `isDeleted`) in the helpers/routes —
+  camelCase is a **wire/response** convention, not a storage one.
+- sqlite's 0/1 integer columns that represent booleans (`is_deleted`, `builtin`, etc.)
+  are lifted to real BSON booleans so query predicates (`doc! { "is_deleted": false }`)
+  and `get_bool(...)` reads match MongoDB semantics.
 - Dates stay as ISO-8601 strings (the backend `.get_str` reads them; no BSON Date type
   is relied upon in the core read paths).
 - Empty relationships (e.g. `files.data`, `fingerprint_templates.template`) are omitted
@@ -22,7 +30,7 @@ Table name → collection (mostly 1:1):
 | sqlite table            | Mongo collection         | Notes |
 |-------------------------|--------------------------|-------|
 | users                   | `users`                  | mirror, `password_hash` kept |
-| sessions                | `sessions`               | `token` → `_id`, `expiresAt` |
+| sessions                | `sessions`               | `token` → `_id`, `expires_at` (backend TTL index) |
 | roles                   | `roles`                  | `key` → `_id` |
 | role_permissions        | `role_permissions`       | `role`/`section` pairs |
 | user_permissions        | `user_permissions`       | empty in snapshot |
@@ -32,7 +40,7 @@ Table name → collection (mostly 1:1):
 | exams                   | `exams`                  | |
 | results                 | `results`                | |
 | assignments             | `assignments`            | |
-| submissions             | `submissions`            | file stored on disk; `file_name`→`fileName` |
+| submissions             | `submissions`            | file stored on disk; `file_path` kept |
 | fee_items               | `fees`                   | **renamed table** |
 | receipts                | `receipts`               | |
 | scholarships            | `scholarships`           | |
@@ -58,22 +66,22 @@ Table name → collection (mostly 1:1):
 
 ## 2. Field transforms (representative)
 
-General rule: strip the leading `_`-id column you promote to `_id`, then left-pad the
-rest, converting each remaining column to camelCase. Examples:
+General rule: promote the PK column (sqlite `id` / `token` / `key` / `device_id`) to
+`_id`, then keep every other column name **unchanged (snake_case)**. Example:
 
 - `users`:
   - `_id = id`
-  - `passwordHash` ← `password_hash` (scrypt hex string; fully interoperable — backend
+  - `password_hash` (scrypt hex string; fully interoperable — backend
     scrypt params `log_n=14, r=8, p=1, keylen=64` already verified against Node hashes)
-  - `avatarInitials`, `department`, `batch`, `semester` (int), `rollNo`, `mentorId`,
-    `designation`, `subjects` (CSV → array or kept string), `phone`, `address`,
-    `guardianName`, `guardianPhone`, `emergencyContact`, `dob`, `isDeleted`.
-- `check_ins`: `_id=id`, `userId`, `name`, `role`, `time`, `status`, `method`,
-  `deviceId`, `source`, `createdAt`.
+  - `avatar_initials`, `department`, `batch`, `semester` (int), `roll_no`, `mentor_id`,
+    `designation`, `subjects` (CSV kept), `phone`, `address`, `guardian_name`,
+    `guardian_phone`, `emergency_contact`, `dob`, `is_deleted` (bool).
+- `check_ins`: `_id=id`, `user_id`, `name`, `role`, `time`, `status`, `method`,
+  `device_id`, `source`, `created_at`.
 - `mentors`: `_id=id`, `mentees` as **array of user ids** (from comma CSV).
-- `fees` (from `fee_items`): `_id=id`, `studentId`, `name`, `amount` (numeric),
-  `dueDate`, `status`, `paidDate`, `method`, `receiptId`.
-- `receipts`: `_id=id`, `transactionId`/`transaction_id` → consolidated.
+- `fees` (from `fee_items`): `_id=id`, `student_id`, `name`, `amount` (numeric),
+  `due_date`, `status`, `paid_date`, `method`, `receipt_id`.
+- `receipts`: `_id=id`, `transaction_id`, etc. (snake_case preserved).
 - `fingerprint_devices`: `_id=device_id`.
 
 ---
@@ -87,7 +95,7 @@ rest, converting each remaining column to camelCase. Examples:
    `admin@flowdesk.edu` / `flowdesk-admin@2026` are guaranteed to verify.
 3. **`files`** — sqlite `files` table is empty in the snapshot. Migration writes a
    `.process_files()` stub that, when non-empty, would write `data/uploads/<id>-<safeName>`
-   and record only the path in `submissions.filePath` (matching the backend's mount rule).
+   and record only the path in `submissions.file_path` (matching the backend's mount rule).
 4. **Empty tables** — collections for `conversation_participants`, `messages`, `files`,
    `user_permissions`, all `fingerprint_*`, and `withdrawals` seed as empty (or zero-row);
    the backend creates/uses them lazily.
@@ -103,14 +111,16 @@ target database name (default derived from config, e.g. `flowdesk`).
 python migration/seed.py \
   --db <path-to-snapshot.db> \
   --mongo-uri mongodb://localhost:27017 \
-  --database flowdesk
+  --mongo-db flowdesk
 ```
 
 The script:
 
-1. Reads every table into the camelCase document shape above.
-2. Connects to the target Mongo database and `drop_database` (idempotent, opt-in with
-   `--drop`), then inserts each collection via bulk `insert_many`.
+1. Reads every table into the snake_case document shape above (PK column → `_id`,
+   bools lifted to BSON booleans).
+2. Writes per-collection JSON files, then either loads directly via `pymongo`
+   (`--mongo-uri`) or emits `out/load.sh` (mongosh/`mongoimport --drop`) as a
+   no-dependency path.
 3. Prints per-collection row counts that must equal the sqlite source counts (from § row
    counts above) as a verification gate.
 
@@ -122,10 +132,11 @@ The script:
 
 ## 5. Known out-of-scope / deferred items
 
-- `POST /api/exams/report-card` (PDF stream) — depends on a PDF-generation library.
-  The migration ports the data + `POST /api/exams/results` api, but the PDF rendering
-  endpoint is deferred to a follow-up (no PDF crate added yet). All other contract
-  endpoints are ported.
+- None blocking. The three formerly-frontend-only endpoints are ported to the Rust
+  backend: `POST /api/exams/report-card` and `GET /api/receipts/{id}/pdf` render a
+  dependency-free single-page PDF (built-in Helvetica), and
+  `GET /api/scholarships/applications/{id}/docs?file=` streams an uploaded document.
+  Hosting + MongoDB Atlas provisioning remain user-side setup (see `backend/README-deploy.md`).
 
 ## 6. Verification checklist (post-seed)
 

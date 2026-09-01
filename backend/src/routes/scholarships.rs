@@ -1,28 +1,25 @@
 use crate::constants::{MAX_SCHOLARSHIP_DOCS, SCHOLARSHIP_STATUSES};
 use crate::error::ApiError;
 use crate::middleware::auth;
+use crate::services::storage;
 use crate::services::util as u;
 use crate::state::AppState;
-use axum::extract::{Path, State};
-use axum::http::HeaderMap;
+use axum::extract::{Path, Query, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use futures::TryStreamExt;
 use mongodb::bson::{doc, Document};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/scholarships", get(list_scholarships))
-        .route(
-            "/api/scholarships/applications",
-            post(create_application),
-        )
-        .route(
-            "/api/scholarships/applications/{id}",
-            patch(update_application),
-        )
+        .route("/api/scholarships/applications", post(create_application))
+        .route("/api/scholarships/applications/{id}", patch(update_application))
+        .route("/api/scholarships/applications/{id}/docs", get(application_doc))
 }
 
 fn scholarship_to_value(d: &Document) -> Value {
@@ -219,4 +216,81 @@ async fn update_application(
         .unwrap_or(existing);
 
     Ok(Json(json!({ "ok": true, "application": application_to_value(&updated) })))
+}
+
+#[derive(Deserialize)]
+struct DocQuery {
+    file: Option<String>,
+}
+
+/// GET /api/scholarships/applications/{id}/docs?file=<name>
+/// Streams one supporting document. Doc entries are matched by name (or string
+/// path) against the stored docs array, so a `file` value cannot escape the
+/// application's own documents. Only the owning student or an admin may read.
+async fn application_doc(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<DocQuery>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApiError> {
+    let user = auth::require_session_user(&state, &headers).await?;
+    let file_query = q.file.unwrap_or_default().trim().to_string();
+
+    let apps_coll = state.db.collection::<Document>("scholarship_applications");
+    let app = apps_coll
+        .find_one(doc! { "_id": &id }, None)
+        .await?
+        .ok_or_else(|| ApiError::not_found("Application not found"))?;
+
+    let student_id = app.get_str("student_id").unwrap_or("").to_string();
+    if user.role != "admin" && student_id != user.id {
+        return Err(ApiError::forbidden("Forbidden"));
+    }
+
+    // Resolve the matching doc entry.
+    let empty_docs: Vec<mongodb::bson::Bson> = Vec::new();
+    let docs = app.get_array("docs").unwrap_or(&empty_docs);
+    let mut resolved: Option<String> = None;
+    for item in docs {
+        if let Some(doc) = item.as_document() {
+            let name = doc.get_str("name").unwrap_or("").to_string();
+            let path = doc.get_str("path").unwrap_or("").to_string();
+            if name == file_query {
+                resolved = Some(path);
+                break;
+            }
+        } else if let Some(s) = item.as_str() {
+            if s == file_query {
+                resolved = Some(s.to_string());
+                break;
+            }
+        }
+    }
+
+    let path = resolved.ok_or_else(|| ApiError::not_found("File not found"))?;
+    let bytes = std::fs::read(&path).map_err(|_| ApiError::not_found("File not found"))?;
+
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_query.clone());
+    let mime = storage::mime_for(&name).to_string();
+
+    let mut headers_map = HeaderMap::new();
+    headers_map.insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(&mime).map_err(|_| ApiError::bad_request("bad content type"))?,
+    );
+    headers_map.insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("inline; filename=\"{}\"", name.replace('"', "")))
+            .map_err(|_| ApiError::bad_request("bad filename"))?,
+    );
+    headers_map.insert(
+        axum::http::header::CONTENT_LENGTH,
+        HeaderValue::from_str(&bytes.len().to_string())
+            .map_err(|_| ApiError::bad_request("bad length"))?,
+    );
+
+    Ok((StatusCode::OK, headers_map, bytes))
 }

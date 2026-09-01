@@ -43,6 +43,17 @@ struct UserProfileOut {
     mentor_id: Option<String>,
     designation: Option<String>,
     subjects: Option<Vec<String>>,
+    phone: Option<String>,
+    address: Option<String>,
+    #[serde(rename = "guardianName")]
+    guardian_name: Option<String>,
+    #[serde(rename = "guardianPhone")]
+    guardian_phone: Option<String>,
+    #[serde(rename = "emergencyContact")]
+    emergency_contact: Option<String>,
+    dob: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 impl From<User> for UserProfileOut {
@@ -60,6 +71,13 @@ impl From<User> for UserProfileOut {
             mentor_id: u.mentor_id,
             designation: u.designation,
             subjects: u.subjects,
+            phone: u.phone,
+            address: u.address,
+            guardian_name: u.guardian_name,
+            guardian_phone: u.guardian_phone,
+            emergency_contact: u.emergency_contact,
+            dob: u.dob,
+            is_deleted: u.is_deleted,
         }
     }
 }

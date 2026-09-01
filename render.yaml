@@ -1,18 +1,37 @@
+# Render Blueprint for the FlowDesk Rust (Axum) backend.
+#
+# How to deploy:
+#   1. Push this repo to GitHub (branch migration/rust-backend).
+#   2. In Render: New -> Blueprint -> select the repo -> pick this file.
+#   3. Set the secret env vars at Deploy time:
+#        MONGODB_URI  = your MongoDB Atlas connection string
+#        JWT_SECRET   = a long random string (see backend/README-deploy.md)
+#      (Render injects PORT automatically.)
+#   4. Click "Apply". Render builds ./backend/Dockerfile and serves the API.
+#
+# After deploy, set:
+#     netlify.toml -> the /api/* rewrite to https://<your-service>.onrender.com/api/:splat
+#   and CORS_ORIGINS remains https://flowdesk-campus.netlify.app
 services:
   - type: web
-    name: flowdesk
-    runtime: node
-    plan: starter
-    buildCommand: cd flowdesk-app && npm install && npm run build
-    startCommand: cd flowdesk-app && npm start
-    disk:
-      name: flowdesk-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
+    name: flowdesk-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    dockerContext: ./backend
+    healthCheckPath: /healthz
     envVars:
-      - key: NODE_VERSION
-        value: 22
-      - key: SEED
-        value: "true"
-      - key: NODE_ENV
-        value: production
+      - key: MONGODB_URI
+        sync: false                     # set in Render dashboard
+        required: true
+      - key: JWT_SECRET
+        sync: false                     # set in Render dashboard
+        required: true
+      - key: MONGODB_DB
+        value: flowdesk
+      - key: SESSION_COOKIE
+        value: flowdesk.session
+      - key: CORS_ORIGINS
+        value: https://flowdesk-campus.netlify.app
+      - key: DATA_DIR
+        value: /app/.data

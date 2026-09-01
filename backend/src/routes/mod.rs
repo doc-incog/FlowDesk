@@ -17,11 +17,19 @@ pub mod scholarships;
 pub mod withdrawals;
 
 use crate::state::AppState;
+use axum::routing::get;
 use axum::Router;
+use serde_json::json;
+
+/// Liveness probe for host health checks (does not require a DB connection).
+async fn healthz() -> axum::Json<serde_json::Value> {
+    axum::Json(json!({ "status": "ok" }))
+}
 
 /// Build the full API router.
 pub fn api_router() -> Router<AppState> {
     auth::router()
+        .route("/healthz", get(healthz))
         .merge(directory::router())
         .merge(roles::router())
         .merge(checkins::router())
