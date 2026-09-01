@@ -61,7 +61,17 @@ def transform(db) -> dict:
     `created_at`, `conversation_id`). The JSON API camelCases on output in the
     helpers/routes, but the *stored* documents are snake_case. So this
     transform preserves snake_case column names verbatim and only promotes the
-    primary key column (id / token / key / device_id) to `_id`.
+    identity column to `_id`.
+
+    `_id` promotion rule (must match the backend's `_id` reads):
+      - `id` -> `_id`  (most tables)
+      - `token` -> `_id` (sessions)
+      - `key` -> `_id` for roles
+      - `device_id` -> `_id` ONLY for `fingerprint_devices` (its sole PK);
+        in check_ins / fingerprint_* others, `device_id` stays a normal field
+        and `id` is promoted.
+      - tables with no identity column (role_permissions, user_permissions,
+        conversation_reads, notification_reads) get a synthetic `_id`.
     """
     out: dict = {}
     tables = [
@@ -78,13 +88,24 @@ def transform(db) -> dict:
         cols, data = rows(db, table)
         coll = "fees" if table == "fee_items" else table
         coll = coll.replace("conversation_participants", "conversation_reads")
+        # Decide the identity column for this table.
+        id_col = None
+        if table == "fingerprint_devices":
+            id_col = "device_id"
+        elif "id" in cols:
+            id_col = "id"
+        elif "token" in cols:
+            id_col = "token"
+        elif "key" in cols:
+            id_col = "key"
         docs = []
+        n = 0
         for row in data:
             doc = {}
             for c, v in zip(cols, row):
-                # Promote the primary key column to `_id`; keep other field
-                # names untouched (snake_case, matching the Rust backend reads).
-                if c in ("id", "token", "key", "device_id"):
+                # Promote the identity column to `_id`; keep every other field
+                # name untouched (snake_case, matching the Rust backend reads).
+                if c == id_col:
                     k = "_id"
                 else:
                     k = c
@@ -94,6 +115,10 @@ def transform(db) -> dict:
                 if c in BOOL_COLUMNS:
                     jv = bool(jv)
                 doc[k] = jv
+            if id_col is None:
+                # Pair tables with no natural key: synthesize a string _id.
+                n += 1
+                doc["_id"] = f"{coll}-{n}"
             # mentees: csv of names -> keep as raw for snapshot fidelity (no user ids)
             if table == "mentors" and isinstance(doc.get("mentees"), str):
                 doc["mentees"] = [s.strip() for s in doc["mentees"].split(",") if s.strip()]

@@ -12,7 +12,7 @@ use crate::state::AppState;
 use axum::http::HeaderValue;
 use axum::Router;
 use std::env;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 #[tokio::main]
@@ -48,8 +48,22 @@ async fn main() {
                 .filter_map(|o| HeaderValue::from_str(o).ok())
                 .collect::<Vec<_>>(),
         )
-        .allow_methods(Any)
-        .allow_headers(Any)
+        // With credentials, tower-http forbids wildcard methods/headers; list
+        // the methods and headers the web/mobile clients actually use.
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::PATCH,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+            axum::http::header::AUTHORIZATION,
+        ])
+        .expose_headers([axum::http::header::CONTENT_DISPOSITION])
         .allow_credentials(true);
 
     let app: Router = routes::api_router()

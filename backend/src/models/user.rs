@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-/// Mirrors the web `UserProfile` object. Snake_case field names are serialized
-/// as camelCase to match the JSON the frontend/mobile clients expect.
+/// Mirrors the web `UserProfile` object. Stored Mongo documents use snake_case
+/// field names (the backend reads them that way throughout); this struct wires
+/// the stored snake_case keys to idiomatic Rust fields. JSON (camelCase)
+/// serialization for the API is handled separately by `UserProfileOut`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     #[serde(rename = "_id")]
@@ -11,14 +13,11 @@ pub struct User {
     pub email: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
-    #[serde(rename = "avatarInitials")]
     pub avatar_initials: String,
     pub department: Option<String>,
     pub batch: Option<String>,
     pub semester: Option<String>,
-    #[serde(rename = "rollNo")]
     pub roll_no: Option<String>,
-    #[serde(rename = "mentorId")]
     pub mentor_id: Option<String>,
     pub designation: Option<String>,
     pub subjects: Option<Vec<String>>,
@@ -29,6 +28,7 @@ pub struct User {
     pub emergency_contact: Option<String>,
     pub dob: Option<String>,
     pub is_deleted: bool,
+    #[serde(default)]
     pub created_at: String,
 }
 

@@ -47,7 +47,8 @@ impl IntoResponse for ApiError {
 
 // Allow `?` from errors that implement std::error::Error (e.g. DB errors).
 impl<E: std::error::Error + Send + Sync + 'static> From<E> for ApiError {
-    fn from(_e: E) -> Self {
+    fn from(e: E) -> Self {
+        tracing::warn!(error = %e, "handler error");
         ApiError::internal("internal server error")
     }
 }
