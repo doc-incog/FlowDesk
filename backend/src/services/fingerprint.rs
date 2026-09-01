@@ -255,3 +255,92 @@ pub async fn record_device_health(
     .await?;
     Ok(())
 }
+
+/// Enqueue a pending command for a device; publishes `command-queued` on the SSE bus.
+pub async fn enqueue_command(
+    db: &Database,
+    bus: &SseBus,
+    device_id: &str,
+    command: &str,
+    params: serde_json::Value,
+) -> mongodb::error::Result<String> {
+    let coll = db.collection::<Document>("fingerprint_commands");
+    let id = u::id_fp_command();
+    coll.insert_one(
+        doc! {
+            "_id": &id,
+            "device_id": device_id,
+            "command": command,
+            "params": params.to_string(),
+            "status": "pending",
+            "created_at": u::iso_now(),
+            "completed_at": Bson::Null,
+        },
+        None,
+    )
+    .await?;
+    let _ = params;
+    bus.publish(
+        device_id,
+        serde_json::json!({ "type": "command-queued", "commandId": id, "command": command }),
+    );
+    Ok(id)
+}
+
+/// Pop the oldest pending command (oldest first) atomically -> status `sent`.
+pub async fn get_next_command(db: &Database, device_id: &str) -> mongodb::error::Result<Option<Document>> {
+    let coll = db.collection::<Document>("fingerprint_commands");
+    let mut cursor = coll
+        .find(
+            doc! { "device_id": device_id, "status": "pending" },
+            mongodb::options::FindOptions::builder()
+                .sort(doc! { "created_at": 1 })
+                .limit(1)
+                .build(),
+        )
+        .await?;
+    if let Some(cmd) = cursor.try_next().await? {
+        let id = cmd.get_str("_id").unwrap_or("").to_string();
+        coll.update_one(
+            doc! { "_id": &id, "status": "pending" },
+            doc! { "$set": { "status": "sent" } },
+            None,
+        )
+        .await?;
+        return Ok(Some(cmd));
+    }
+    Ok(None)
+}
+
+/// Mark a command completed/failed; publishes `command-result` on the SSE bus.
+pub async fn complete_command(
+    db: &Database,
+    bus: &SseBus,
+    command_id: &str,
+    status: &str,
+    result: Option<serde_json::Value>,
+) -> mongodb::error::Result<()> {
+    let coll = db.collection::<Document>("fingerprint_commands");
+    let cmd = coll.find_one(doc! { "_id": command_id }, None).await?;
+    let device_id = cmd
+        .as_ref()
+        .and_then(|c| c.get_str("device_id").ok())
+        .unwrap_or("")
+        .to_string();
+    coll.update_one(
+        doc! { "_id": command_id },
+        doc! { "$set": { "status": status, "completed_at": u::iso_now() } },
+        None,
+    )
+    .await?;
+    bus.publish(
+        &device_id,
+        serde_json::json!({
+            "type": "command-result",
+            "commandId": command_id,
+            "status": status,
+            "result": result.unwrap_or(serde_json::Value::Null),
+        }),
+    );
+    Ok(())
+}

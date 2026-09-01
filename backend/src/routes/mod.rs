@@ -8,6 +8,7 @@ pub mod directory;
 pub mod exams;
 pub mod feedback;
 pub mod fees;
+pub mod fingerprint;
 pub mod notifications;
 pub mod overview;
 pub mod roles;
@@ -32,6 +33,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(conversations::router())
         .merge(fees::router())
         .merge(scholarships::router())
+        .merge(fingerprint::router())
         .merge(admissions::router())
         .merge(complaints::router())
         .merge(feedback::router())

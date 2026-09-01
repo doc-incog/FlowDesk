@@ -107,6 +107,11 @@ pub async fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<User
     require_role(state, headers, &["admin"]).await
 }
 
+/// Resolve the session user if any (do not error when absent/anonymous).
+pub async fn session_user_opt(state: &AppState, headers: &HeaderMap) -> Result<Option<User>, ApiError> {
+    get_session_user(state, headers).await
+}
+
 /// Parse and check expiry of a stored RFC3339 expiration string.
 fn is_expired(expires_at: &str) -> bool {
     match chrono::DateTime::parse_from_rfc3339(expires_at) {
