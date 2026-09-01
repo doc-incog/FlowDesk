@@ -32,8 +32,14 @@ export async function GET() {
     .all()
     .map((r) => mapUser(r as Parameters<typeof mapUser>[0]))
 
+  // Only list mentors that map to an actual active (non-deleted) staff account,
+  // so the mentor dropdown never shows roster-only entries whose staff user was
+  // deleted. Mirrors the filtering used by /api/mentees.
   const mentors = db
-    .prepare("SELECT id, name, designation, department, email, phone, office, office_hours, avatar_initials, mentees FROM mentors ORDER BY name")
+    .prepare(`SELECT m.id, m.name, m.designation, m.department, m.email, m.phone, m.office, m.office_hours, m.avatar_initials, m.mentees
+              FROM mentors m
+              JOIN users u ON u.name = m.name AND u.role = 'staff' AND u.is_deleted = 0
+              ORDER BY m.name`)
     .all() as {
     id: string
     name: string

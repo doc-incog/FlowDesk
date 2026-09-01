@@ -23,13 +23,13 @@ import {
   MessageSquareText,
   MessageSquare,
   ShieldCheck,
+  DoorOpen,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Avatar, RoleBadge } from "@/components/dashboard/primitives"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
-import { AIChat } from "@/components/ai-chat"
 
 import { OverviewSection } from "@/components/dashboard/sections/overview"
 import { CheckInSection } from "@/components/dashboard/sections/check-in"
@@ -48,6 +48,7 @@ import { FeedbackSection } from "@/components/dashboard/sections/feedback"
 import { ProfileSection } from "@/components/dashboard/sections/profile"
 import { RolesSection } from "@/components/dashboard/sections/roles"
 import { ChatSection } from "@/components/dashboard/sections/chat"
+import { WithdrawalsSection } from "@/components/dashboard/sections/withdrawals"
 
 export type SectionId =
   | "overview"
@@ -57,6 +58,7 @@ export type SectionId =
   | "staff"
   | "mentor"
   | "mentees"
+  | "withdrawals"
   | "chat"
   | "schedule"
   | "exams"
@@ -84,6 +86,7 @@ const NAV: NavItem[] = [
   { id: "staff", label: "Staff", icon: Users, roles: ["admin"] },
   { id: "mentor", label: "Mentor", icon: UserRound, roles: ["student", "staff"] },
   { id: "mentees", label: "Mentees", icon: Users, roles: ["admin"] },
+  { id: "withdrawals", label: "Withdrawal", icon: DoorOpen, roles: ["student", "admin"] },
   { id: "chat", label: "Messages", icon: MessageSquare, roles: ["student", "staff", "admin"] },
   { id: "schedule", label: "Schedule", icon: CalendarDays, roles: ["student", "staff", "admin"] },
   { id: "exams", label: "Exams & Results", icon: ClipboardList, roles: ["student", "staff", "admin"] },
@@ -228,6 +231,8 @@ export function DashboardShell() {
         return <MentorSection role={user.role} mentorId={user.mentorId} />
       case "mentees":
         return <MenteesSection />
+      case "withdrawals":
+        return <WithdrawalsSection role={user.role} />
       case "chat":
         return <ChatSection role={user.role} />
       case "schedule":
@@ -418,8 +423,6 @@ export function DashboardShell() {
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>
-
-      <AIChat />
     </div>
   )
 }

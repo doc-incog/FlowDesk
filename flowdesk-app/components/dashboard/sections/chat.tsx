@@ -18,6 +18,7 @@ type Conversation = {
   lastSenderId: string
   lastMessageAt: string
   unreadCount: number
+  hidden?: boolean
   participants: Participant[]
 }
 
@@ -67,6 +68,7 @@ export function ChatSection({ role }: { role: string }) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [confirmingHideId, setConfirmingHideId] = useState<string | null>(null)
   const [sidebarFilter, setSidebarFilter] = useState("")
+  const [hiddenConversations, setHiddenConversations] = useState<Conversation[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -77,12 +79,16 @@ export function ChatSection({ role }: { role: string }) {
     let alive = true
     Promise.all([
       fetch("/api/conversations").then((r) => r.json()),
+      fetch("/api/conversations?includeHidden=true").then((r) => r.json()),
       fetch("/api/auth/me").then((r) => r.json()),
     ])
-      .then(([conv, auth]) => {
+      .then(([conv, hidden, auth]) => {
         if (!alive) return
         if (conv?.error) setError(conv.error)
         else setConversations(conv.conversations ?? [])
+        if (hidden?.conversations) {
+          setHiddenConversations(hidden.conversations.filter((c: Conversation) => c.hidden))
+        }
         if (auth?.user) setMe(auth.user)
         else if (auth?.error && !conv?.error) setError(auth.error)
       })
@@ -95,15 +101,21 @@ export function ChatSection({ role }: { role: string }) {
 
   const refreshConversations = useCallback(async () => {
     try {
-      const res = await fetch("/api/conversations")
+      const [res, resHidden] = await Promise.all([
+        fetch("/api/conversations"),
+        fetch("/api/conversations?includeHidden=true"),
+      ])
       const d = await res.json()
       if (d?.conversations) setConversations(d.conversations)
+      const dHidden = await resHidden.json()
+      if (dHidden?.conversations) {
+        setHiddenConversations(dHidden.conversations.filter((c: Conversation) => c.hidden))
+      }
     } catch {
-      // Sidebar refreshes on the next poll
+
     }
   }, [])
 
-  // Keep the sidebar live: new conversations, unread badges, last messages.
   useEffect(() => {
     let alive = true
     const timer = setInterval(() => {
@@ -125,7 +137,6 @@ export function ChatSection({ role }: { role: string }) {
         .then((d) => {
           if (!alive || !d?.messages) return
           setMessages((prev) => {
-            // Skip state churn when nothing changed so polling doesn't fight scrolling.
             const last = d.messages[d.messages.length - 1]
             if (
               prev.length === d.messages.length &&
@@ -137,7 +148,7 @@ export function ChatSection({ role }: { role: string }) {
             return d.messages
           })
         })
-        .catch(() => {})
+        .catch(() => { })
     }
     poll()
     const timer = setInterval(poll, 2000)
@@ -226,7 +237,7 @@ export function ChatSection({ role }: { role: string }) {
         )
       }
     } catch {
-      // Will be caught on next poll
+
     } finally {
       setSending(false)
     }
@@ -234,19 +245,15 @@ export function ChatSection({ role }: { role: string }) {
 
   const activeConversation = conversations.find((c) => c.id === activeId)
 
-  // For a direct chat, the "other" participant may have been deleted. Their
-  // messages remain readable but the thread becomes read-only.
   const otherDeleted =
     activeConversation?.type === "direct" &&
     (activeConversation.participants.find((p) => p.id !== me?.id)?.deleted ?? false)
 
-  // Deleting a conversation removes it for everyone, so clear the open thread
-  // if it is the one being deleted.
+
   const hideConversation = async (id: string) => {
     try {
       await fetch(`/api/conversations/${id}?action=hide`, { method: "DELETE" })
     } catch {
-      // The sidebar refresh below will reconcile the list
     }
     setConfirmingHideId(null)
     if (activeId === id) {
@@ -256,11 +263,20 @@ export function ChatSection({ role }: { role: string }) {
     refreshConversations()
   }
 
+  const unhideConversation = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}?action=unhide`, { method: "DELETE" })
+    } catch {
+    }
+    loadMessages(id)
+    refreshConversations()
+  }
+
   const deleteConversation = async (id: string) => {
     try {
       await fetch(`/api/conversations/${id}?action=delete`, { method: "DELETE" })
     } catch {
-      // The sidebar refresh below will reconcile the list
+
     }
     setConfirmingDeleteId(null)
     if (activeId === id) {
@@ -351,7 +367,7 @@ export function ChatSection({ role }: { role: string }) {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 && (
+            {conversations.length === 0 && hiddenConversations.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-4 py-12 text-center text-sm text-muted-foreground">
                 <MessageSquare className="h-6 w-6" aria-hidden />
                 <p>No conversations yet.</p>
@@ -360,15 +376,17 @@ export function ChatSection({ role }: { role: string }) {
             )}
             {(() => {
               const q = sidebarFilter.trim().toLowerCase()
+              const matches = (c: Conversation) =>
+                c.title.toLowerCase().includes(q) ||
+                c.participants.some((p) => p.name.toLowerCase().includes(q)) ||
+                (c.lastMessage ?? "").toLowerCase().includes(q)
+              // When searching, also surface hidden conversations that match so a
+              // hidden chat can be reopened directly instead of via "New chat".
               const visible = q
-                ? conversations.filter(
-                    (c) =>
-                      c.title.toLowerCase().includes(q) ||
-                      c.participants.some((p) => p.name.toLowerCase().includes(q)) ||
-                      (c.lastMessage ?? "").toLowerCase().includes(q),
-                  )
+                ? conversations.filter(matches).concat(hiddenConversations.filter(matches))
                 : conversations
-              if (conversations.length > 0 && visible.length === 0) {
+              const total = conversations.length + hiddenConversations.length
+              if (total > 0 && visible.length === 0) {
                 return (
                   <p className="px-4 py-8 text-center text-sm text-muted-foreground">No conversations match.</p>
                 )
@@ -379,18 +397,23 @@ export function ChatSection({ role }: { role: string }) {
                 const confirmingDelete = confirmingDeleteId === conv.id
                 const confirmingHide = confirmingHideId === conv.id
                 const confirming = confirmingDelete || confirmingHide
+                const openConv = () => {
+                  if (confirmingDeleteId && confirmingDeleteId !== conv.id) setConfirmingDeleteId(null)
+                  if (confirmingHideId && confirmingHideId !== conv.id) setConfirmingHideId(null)
+                  if (conv.hidden) {
+                    unhideConversation(conv.id)
+                  } else {
+                    loadMessages(conv.id)
+                  }
+                }
                 return (
                   <div
                     key={conv.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => {
-                      if (confirmingDeleteId && confirmingDeleteId !== conv.id) setConfirmingDeleteId(null)
-                      if (confirmingHideId && confirmingHideId !== conv.id) setConfirmingHideId(null)
-                      loadMessages(conv.id)
-                    }}
+                    onClick={openConv}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") loadMessages(conv.id)
+                      if (e.key === "Enter") openConv()
                     }}
                     className={cn(
                       "group flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-3 text-left transition-colors",
@@ -405,6 +428,11 @@ export function ChatSection({ role }: { role: string }) {
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">
                           {other?.name ?? conv.title}
+                          {conv.hidden && (
+                            <span className="ml-1.5 rounded-sm border border-border bg-secondary px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Hidden
+                            </span>
+                          )}
                         </p>
                         {conv.lastMessageAt && !confirming && (
                           <span className="shrink-0 text-[10px] text-muted-foreground">

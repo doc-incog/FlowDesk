@@ -38,6 +38,21 @@ export async function POST(request: Request) {
     )
   }
 
+  // Only one application may be pending at a time: once a student has an
+  // application in "submitted" or "under-review", they cannot submit for a
+  // different scholarship until the admin has approved or rejected it.
+  const pending = db
+    .prepare(
+      "SELECT id FROM scholarship_applications WHERE student_id = ? AND status IN ('submitted', 'under-review')",
+    )
+    .get(user.id) as { id: string } | undefined
+  if (pending) {
+    return NextResponse.json(
+      { error: "You already have a pending scholarship application. Wait for it to be reviewed before applying again." },
+      { status: 409 },
+    )
+  }
+
   if (files.length > MAX_DOCS) {
     return NextResponse.json({ error: `Attach at most ${MAX_DOCS} documents` }, { status: 400 })
   }

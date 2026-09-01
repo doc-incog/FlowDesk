@@ -374,11 +374,17 @@ function PersonForm({
           <input type="email" className={inputCls} value={form.email} onChange={(e) => set("email")(e.target.value)} />
         </Field>
         <Field label="Role">
-          <select className={inputCls} value={form.role} onChange={(e) => set("role")(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r.key} value={r.key}>{r.label}</option>
-            ))}
-          </select>
+          {person ? (
+            <select className={inputCls} value={form.role} onChange={(e) => set("role")(e.target.value)}>
+              {roles.map((r) => (
+                <option key={r.key} value={r.key}>{r.label}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex h-10 items-center rounded-sm border border-input bg-secondary/50 px-3 text-sm">
+              {kind === "staff" ? "Staff" : "Student"}
+            </div>
+          )}
         </Field>
         <Field label="Department">
           <input className={inputCls} value={form.department} onChange={(e) => set("department")(e.target.value)} />

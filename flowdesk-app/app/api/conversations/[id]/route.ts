@@ -4,9 +4,10 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
-// DELETE /api/conversations/[id]?action=hide|delete
+// DELETE /api/conversations/[id]?action=hide|unhide|delete
 //   hide   — soft-hide: mark is_hidden for this user; other participants still see it.
 //           If the other user messages, the conversation reappears for both.
+//   unhide — restore a hidden conversation back into this user's sidebar/search.
 //   delete — permanent: remove this user from conversation_participants.
 //           If no participants remain, the conversation and its messages are also removed.
 export async function DELETE(
@@ -28,7 +29,11 @@ export async function DELETE(
     .get(id, user.id)
   if (!participant) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  if (action === "delete") {
+  if (action === "unhide") {
+    db.prepare(
+      "UPDATE conversation_participants SET is_hidden = 0 WHERE conversation_id = ? AND user_id = ?",
+    ).run(id, user.id)
+  } else if (action === "delete") {
     // Hard delete: remove the user from the conversation
     db.prepare(
       "DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?",

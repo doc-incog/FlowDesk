@@ -4,22 +4,27 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const db = getDb()
+  const url = new URL(request.url)
+  const includeHidden = url.searchParams.get("includeHidden") === "true"
 
+  // includeHidden=true returns conversations hidden by this user as well, so the
+  // chat sidebar search can surface and re-open them instead of requiring a new
+  // chat. Each row is flagged with is_hidden so the UI can distinguish them.
   const rows = db
     .prepare(`
-      SELECT c.id, c.type, c.title, c.created_at, c.updated_at,
+      SELECT c.id, c.type, c.title, c.created_at, c.updated_at, cp.is_hidden as is_hidden,
         (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT sender_id FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_sender_id,
         (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at,
         (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND created_at > COALESCE(cp.last_read_at, '')) as unread_count
       FROM conversations c
       JOIN conversation_participants cp ON cp.conversation_id = c.id
-      WHERE cp.user_id = ? AND cp.is_hidden = 0
+      WHERE cp.user_id = ? ${includeHidden ? "" : "AND cp.is_hidden = 0"}
       ORDER BY last_message_at DESC NULLS LAST, c.created_at DESC
     `)
     .all(user.id) as {
@@ -28,6 +33,7 @@ export async function GET() {
     title: string | null
     created_at: string
     updated_at: string
+    is_hidden: number
     last_message: string | null
     last_sender_id: string | null
     last_message_at: string | null
@@ -55,6 +61,7 @@ export async function GET() {
       lastSenderId: r.last_sender_id,
       lastMessageAt: r.last_message_at,
       unreadCount: r.unread_count,
+      hidden: r.is_hidden === 1,
       participants: participants.map((p) => ({
         id: p.id,
         name: p.is_deleted === 1 ? "Unknown User" : p.name,

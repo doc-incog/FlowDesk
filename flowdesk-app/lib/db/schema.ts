@@ -297,5 +297,17 @@ export function createSchema(db: DatabaseSync) {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS withdrawals (
+      id TEXT PRIMARY KEY,
+      student_id TEXT NOT NULL,
+      student_name TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('pending','approved','rejected')),
+      submitted_at TEXT NOT NULL,
+      decided_at TEXT,
+      decision_note TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_withdrawals_student ON withdrawals(student_id);
   `)
 }

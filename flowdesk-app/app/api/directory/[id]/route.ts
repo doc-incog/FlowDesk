@@ -155,9 +155,24 @@ export async function DELETE(
   // Remove attendance check-ins (live operational data)
   db.prepare("DELETE FROM check_ins WHERE user_id = ?").run(id)
 
-  // Clear any mentor references pointing at the deleted person
+  // Clear any mentor references pointing at the deleted person. Mentor roster
+  // rows are linked to staff BY NAME (see /api/mentor, /api/mentees,
+  // /api/directory), so resolve the matching mentor id(s) from the staff
+  // name BEFORE blanking the PII, then un-assign every student assigned to
+  // those mentors and drop the roster row(s). This frees the students to be
+  // reassigned a new mentor from the admin Mentees section.
+  const mentorRows = db
+    .prepare("SELECT id FROM mentors WHERE name = ?")
+    .all(existing.name) as { id: string }[]
+  if (mentorRows.length > 0) {
+    const placeholders = mentorRows.map(() => "?").join(",")
+    const ids = mentorRows.map((m) => m.id)
+    db.prepare(
+      `UPDATE users SET mentor_id = NULL WHERE role = 'student' AND mentor_id IN (${placeholders})`,
+    ).run(...ids)
+    db.prepare(`DELETE FROM mentors WHERE id IN (${placeholders})`).run(...ids)
+  }
   db.prepare("UPDATE users SET mentor_id = NULL WHERE mentor_id = ?").run(id)
-  db.prepare("DELETE FROM mentors WHERE id = ?").run(id)
 
   // Soft-delete: flag the row, blank PII, keep the id for chat/audit refs.
   db.prepare(

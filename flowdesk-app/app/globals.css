@@ -151,13 +151,11 @@
     background-color: color-mix(in oklch, var(--primary) 22%, transparent);
   }
 
-  /* Always show a clear keyboard-focus indicator, regardless of hover state. */
   :focus-visible {
     outline: 2px solid color-mix(in oklch, var(--ring) 75%, transparent);
     outline-offset: 2px;
   }
 
-  /* Honours the user's motion preference by collapsing animations/transitions. */
   @media (prefers-reduced-motion: reduce) {
 
     *,
@@ -173,7 +171,6 @@
 
 @layer utilities {
 
-  /* Ambient depth-of-field background — soft colour blobs behind the glass. */
   .ambient {
     position: relative;
     isolation: isolate;
@@ -192,7 +189,6 @@
       radial-gradient(28rem 24rem at 20% 95%, color-mix(in oklch, var(--chart-4) 6%, transparent), transparent 60%);
   }
 
-  /* Frosted glass surface. */
   .glass {
     border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
     background: color-mix(in oklch, var(--card) 55%, transparent);
@@ -213,7 +209,6 @@
       0 24px 60px -24px rgba(15, 20, 40, 0.28);
   }
 
-  /* Soft tinted pill. */
   .pill {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
   }

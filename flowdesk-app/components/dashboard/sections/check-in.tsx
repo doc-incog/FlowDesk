@@ -19,7 +19,7 @@ type HistoryRecord = {
   source: string
 }
 
-type PersonOption = { id: string; name: string; role: string }
+type PersonOption = { id: string; name: string; role: string; semester?: string | null }
 
 type HistorySummary = {
   total: number
@@ -67,6 +67,8 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   // Manual attendance marking (staff, when the fingerprint scanner is down)
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [markError, setMarkError] = useState<string | null>(null)
+  const [manFilterSemester, setManFilterSemester] = useState("")
+  const [manFilterName, setManFilterName] = useState("")
 
   // Fetch daily records when date changes
   useEffect(() => {
@@ -99,12 +101,13 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
             id: s.id,
             name: s.name,
             role: "student",
+            semester: s.semester,
           }))
         } else {
           const students = (d?.students ?? []) as UserProfile[]
           const staff = (d?.staff ?? []).map((s: UserProfile) => ({ id: s.id, name: s.name, role: s.role }))
           list = [
-            ...students.map((s) => ({ id: s.id, name: s.name, role: "student" as const })),
+            ...students.map((s) => ({ id: s.id, name: s.name, role: "student" as const, semester: s.semester })),
             ...staff,
           ]
         }
@@ -228,6 +231,17 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
       }
     }
   }
+
+  // Manual-marking filters: narrow the mentee list by semester and/or name so the
+  // staff member only sees the students they actually want to mark today.
+  const manSemesters = Array.from(
+    new Set(people.map((p) => p.semester ?? "").filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const manFiltered = people.filter((p) => {
+    if (manFilterSemester && (p.semester ?? "") !== manFilterSemester) return false
+    if (manFilterName.trim() && !p.name.toLowerCase().includes(manFilterName.trim().toLowerCase())) return false
+    return true
+  })
 
   const inputCls =
     "rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -372,8 +386,53 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
           {people.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">No mentees assigned to you.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {people.map((p) => {
+            <>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="man-filter-sem" className="text-xs font-medium text-muted-foreground">Semester</label>
+                  <select
+                    id="man-filter-sem"
+                    value={manFilterSemester}
+                    onChange={(e) => setManFilterSemester(e.target.value)}
+                    className={cn(inputCls, "min-w-40")}
+                  >
+                    <option value="">All semesters</option>
+                    {manSemesters.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="relative space-y-1.5">
+                  <label htmlFor="man-filter-name" className="text-xs font-medium text-muted-foreground">Student name</label>
+                  <input
+                    id="man-filter-name"
+                    type="search"
+                    value={manFilterName}
+                    onChange={(e) => setManFilterName(e.target.value)}
+                    placeholder="Search mentees…"
+                    className={cn(inputCls, "min-w-44")}
+                  />
+                </div>
+                {(manFilterSemester || manFilterName.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => { setManFilterSemester(""); setManFilterName("") }}
+                    className="rounded-sm border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {manFilterSemester || manFilterName.trim()
+                  ? `Showing ${manFiltered.length} of ${people.length} mentees.`
+                  : `${people.length} mentee${people.length === 1 ? "" : "s"} — filter by semester or name to mark attendance for a specific student.`}
+              </p>
+              {manFiltered.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No mentees match the selected filters.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+              {manFiltered.map((p) => {
                 const current = todayStatusMap.get(p.id)
                 return (
                   <li key={p.id} className="flex flex-wrap items-center gap-3 py-2.5">
@@ -411,8 +470,10 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
                     </div>
                   </li>
                 )
-              })}
-            </ul>
+                })}
+                </ul>
+              )}
+            </>
           )}
         </Card>
       )}

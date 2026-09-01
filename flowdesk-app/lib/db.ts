@@ -193,6 +193,53 @@ export function migrateDatabase(db: DatabaseSync) {
   } catch {
     // messages table may not exist on very old databases
   }
+
+  // Withdrawals: students request to withdraw from the programme, admins
+  // review. The student's account stays active until (if ever) a separate
+  // action is taken. Idempotent create-table migration.
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS withdrawals (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        student_name TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending','approved','rejected')),
+        submitted_at TEXT NOT NULL,
+        decided_at TEXT,
+        decision_note TEXT
+      )
+    `)
+    db.exec("CREATE INDEX IF NOT EXISTS idx_withdrawals_student ON withdrawals(student_id)")
+  } catch {
+    // withdrawals table may not exist on very old databases
+  }
+
+  // Grant role access to the new withdrawal sections (student + admin).
+  try {
+    db.exec("INSERT OR IGNORE INTO role_permissions (role, section) VALUES ('student', 'withdrawals')")
+    db.exec("INSERT OR IGNORE INTO role_permissions (role, section) VALUES ('admin', 'withdrawals')")
+  } catch {
+    // role_permissions table may not exist on very old databases
+  }
+
+  // Clean up orphaned mentor roster rows: any mentor whose staff account has
+  // been deleted should be removed, and students pointing at such a mentor are
+  // freed so the admin can reassign them. Idempotent — safe to run every boot.
+  try {
+    db.exec(`
+      DELETE FROM mentors
+      WHERE name NOT IN (SELECT name FROM users WHERE role = 'staff' AND is_deleted = 0)
+    `)
+    db.exec(`
+      UPDATE users
+      SET mentor_id = NULL
+      WHERE mentor_id IS NOT NULL
+        AND mentor_id NOT IN (SELECT id FROM mentors)
+    `)
+  } catch {
+    // mentors/users tables may not exist on very old databases
+  }
 }
 
 export function closeDb() {
