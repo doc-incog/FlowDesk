@@ -12,7 +12,8 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
-  let body: { status?: string; comment?: string } = {}
+
+  let body: { comment?: string; status?: string } = {}
   try {
     body = await request.json()
   } catch {
@@ -20,42 +21,30 @@ export async function PATCH(
   }
 
   const db = getDb()
-  const complaint = db
-    .prepare("SELECT id, status, comments, raised_by_id FROM complaints WHERE id = ?")
-    .get(id) as
-    | { id: string; status: string; comments: string; raised_by_id: string }
-    | undefined
+  const row = db
+    .prepare("SELECT id, comments, status, raised_by_id FROM complaints WHERE id = ?")
+    .get(id) as { id: string; comments: string; status: string; raised_by_id: string | null } | undefined
+  if (!row) return NextResponse.json({ error: "Complaint not found" }, { status: 404 })
 
-  if (!complaint) return NextResponse.json({ error: "Complaint not found" }, { status: 404 })
-
-  // Students can only update their own complaints
-  if (user.role === "student" && complaint.raised_by_id !== user.id) {
+  // Students can only update their own complaints; staff/admin can update any
+  if (user.role === "student" && row.raised_by_id !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const updates: string[] = []
-  const values: (string | number)[] = []
-
-  if (body.status && ["open", "in-progress", "resolved"].includes(body.status)) {
-    updates.push("status = ?")
-    values.push(body.status)
+  if (body.comment) {
+    const comments = JSON.parse(row.comments) as string[]
+    comments.push(`${user.name}: ${body.comment}`)
+    db.prepare("UPDATE complaints SET comments = ? WHERE id = ?").run(JSON.stringify(comments), id)
   }
 
-  if (body.comment?.trim()) {
-    const comments = JSON.parse(complaint.comments) as string[]
-    comments.push(`${user.name}: ${body.comment.trim()}`)
-    updates.push("comments = ?")
-    values.push(JSON.stringify(comments))
+  if (body.status) {
+    const validStatuses = ["open", "in-progress", "resolved"]
+    if (!validStatuses.includes(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    }
+    db.prepare("UPDATE complaints SET status = ? WHERE id = ?").run(body.status, id)
   }
 
-  if (updates.length === 0) {
-    return NextResponse.json({ error: "No valid updates provided" }, { status: 400 })
-  }
-
-  values.push(id)
-  db.prepare(`UPDATE complaints SET ${updates.join(", ")} WHERE id = ?`).run(...values)
-
-  // Re-fetch the updated complaint
   const updated = db
     .prepare("SELECT id, category, subject, description, status, created_at, raised_by_name, raised_by_role, comments FROM complaints WHERE id = ?")
     .get(id) as {
@@ -80,7 +69,31 @@ export async function PATCH(
       createdAt: updated.created_at,
       raisedByName: updated.raised_by_name,
       raisedByRole: updated.raised_by_role,
-      comments: JSON.parse(updated.comments) as string[],
+      comments: JSON.parse(updated.comments),
     },
   })
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { id } = await params
+  const db = getDb()
+
+  const row = db
+    .prepare("SELECT id, raised_by_id FROM complaints WHERE id = ?")
+    .get(id) as { id: string; raised_by_id: string | null } | undefined
+  if (!row) return NextResponse.json({ error: "Complaint not found" }, { status: 404 })
+
+  // Only admin or the person who raised it can delete
+  if (user.role !== "admin" && row.raised_by_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  db.prepare("DELETE FROM complaints WHERE id = ?").run(id)
+  return NextResponse.json({ ok: true })
 }

@@ -58,7 +58,7 @@ export async function GET() {
 
   // Staff see the students they mentor (matched via users.mentor_id).
   const menteeRows = user.role === "staff"
-    ? db.prepare("SELECT * FROM users WHERE mentor_id = ? ORDER BY name").all(mentor.id) as Parameters<typeof mapUser>[0][]
+    ? db.prepare("SELECT * FROM users WHERE mentor_id = ? AND is_deleted = 0 ORDER BY name").all(mentor.id) as Parameters<typeof mapUser>[0][]
     : []
   const mentees = menteeRows.map((m) => mapUser(m))
 

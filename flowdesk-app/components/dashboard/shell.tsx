@@ -24,19 +24,20 @@ import {
   MessageSquare,
   ShieldCheck,
   Fingerprint,
+  DoorOpen,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import type { NotificationItem, Role } from "@/lib/seed-data/core"
 import { Avatar, RoleBadge } from "@/components/dashboard/primitives"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
-import { AIChat } from "@/components/ai-chat"
 
 import { OverviewSection } from "@/components/dashboard/sections/overview"
 import { CheckInSection } from "@/components/dashboard/sections/check-in"
 import { NotificationsSection } from "@/components/dashboard/sections/notifications"
 import { DirectorySection } from "@/components/dashboard/sections/directory"
 import { MentorSection } from "@/components/dashboard/sections/mentor"
+import { MenteesSection } from "@/components/dashboard/sections/mentees"
 import { ScheduleSection } from "@/components/dashboard/sections/schedule"
 import { ExamsSection } from "@/components/dashboard/sections/exams"
 import { AssignmentsSection } from "@/components/dashboard/sections/assignments"
@@ -49,6 +50,7 @@ import { ProfileSection } from "@/components/dashboard/sections/profile"
 import { RolesSection } from "@/components/dashboard/sections/roles"
 import { ChatSection } from "@/components/dashboard/sections/chat"
 import { FingerprintSection } from "@/components/dashboard/sections/fingerprint"
+import { WithdrawalsSection } from "@/components/dashboard/sections/withdrawals"
 
 export type SectionId =
   | "overview"
@@ -57,6 +59,8 @@ export type SectionId =
   | "students"
   | "staff"
   | "mentor"
+  | "mentees"
+  | "withdrawals"
   | "chat"
   | "schedule"
   | "exams"
@@ -84,6 +88,8 @@ const NAV: NavItem[] = [
   { id: "students", label: "Students", icon: GraduationCap, roles: ["staff", "admin"] },
   { id: "staff", label: "Staff", icon: Users, roles: ["admin"] },
   { id: "mentor", label: "Mentor", icon: UserRound, roles: ["student", "staff"] },
+  { id: "mentees", label: "Mentees", icon: Users, roles: ["admin"] },
+  { id: "withdrawals", label: "Withdrawal", icon: DoorOpen, roles: ["student", "admin"] },
   { id: "chat", label: "Messages", icon: MessageSquare, roles: ["student", "staff", "admin"] },
   { id: "schedule", label: "Schedule", icon: CalendarDays, roles: ["student", "staff", "admin"] },
   { id: "exams", label: "Exams & Results", icon: ClipboardList, roles: ["student", "staff", "admin"] },
@@ -122,6 +128,10 @@ export function DashboardShell() {
   const [active, setActive] = useState<SectionId>("overview")
   const [mobileOpen, setMobileOpen] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<{ id: string; name: string; avatarInitials: string; role: string; department: string }[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
 
   useEffect(() => {
     if (ready && !user) router.replace("/")
@@ -129,18 +139,23 @@ export function DashboardShell() {
 
   useEffect(() => {
     let alive = true
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((j) => {
-        if (!alive) return
-        const notifications = (j?.notifications ?? []) as NotificationItem[]
-        setUnread(notifications.filter((n) => n.unread).length)
-      })
-      .catch(() => {
-        // badge stays hidden if notifications can't be loaded
-      })
+    const fetchUnread = () => {
+      fetch("/api/notifications")
+        .then((r) => r.json())
+        .then((j) => {
+          if (!alive) return
+          const notifications = (j?.notifications ?? []) as NotificationItem[]
+          setUnread(notifications.filter((n) => n.unread).length)
+        })
+        .catch(() => {
+          // badge stays hidden if notifications can't be loaded
+        })
+    }
+    fetchUnread()
+    const timer = setInterval(fetchUnread, 5000)
     return () => {
       alive = false
+      clearInterval(timer)
     }
   }, [])
 
@@ -171,6 +186,39 @@ export function DashboardShell() {
     router.replace("/")
   }
 
+  const handleSearch = async (q: string) => {
+    setSearchQuery(q)
+    if (!q.trim()) {
+      setSearchResults([])
+      setShowSearch(false)
+      return
+    }
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(q.trim())}`)
+      const data = await res.json()
+      setSearchResults(data?.users ?? [])
+      setShowSearch(true)
+    } catch {
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const navigateToSearchResult = (result: { role: string }) => {
+    setShowSearch(false)
+    setSearchQuery("")
+    setSearchResults([])
+    if (result.role === "student") {
+      setActive("students")
+    } else if (result.role === "staff") {
+      setActive("staff")
+    } else {
+      setActive("overview")
+    }
+  }
+
   const renderSection = () => {
     switch (active) {
       case "overview":
@@ -185,6 +233,10 @@ export function DashboardShell() {
         return <DirectorySection kind="staff" role={user.role} />
       case "mentor":
         return <MentorSection role={user.role} mentorId={user.mentorId} />
+      case "mentees":
+        return <MenteesSection />
+      case "withdrawals":
+        return <WithdrawalsSection role={user.role} />
       case "chat":
         return <ChatSection role={user.role} />
       case "schedule":
@@ -324,9 +376,32 @@ export function DashboardShell() {
             <Search className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground" aria-hidden />
             <input
               type="search"
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setShowSearch(true)}
+              onBlur={() => setTimeout(() => setShowSearch(false), 200)}
               placeholder="Search people, modules…"
               className="w-full rounded-lg border border-input bg-card/70 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
             />
+            {showSearch && searchResults.length > 0 && (
+              <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                {searchResults.slice(0, 8).map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => navigateToSearchResult(u)}
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-secondary"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
+                      {u.avatarInitials}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{u.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{u.role} · {u.department}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="ml-auto flex items-center gap-2 md:ml-3">
@@ -354,8 +429,6 @@ export function DashboardShell() {
           <div className="mx-auto max-w-6xl">{renderSection()}</div>
         </main>
       </div>
-
-      <AIChat />
     </div>
   )
 }

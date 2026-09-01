@@ -31,19 +31,30 @@ export async function GET() {
     .map((s) => ({ id: s.id, day: s.day, start: s.start, end: s.end, module: s.module, code: s.code, room: s.room, staff: s.staff }))
 
   const notifications = db
-    .prepare("SELECT id, title, body, time, category, unread FROM notifications WHERE unread = 1 AND (user_id IS NULL OR user_id = ?)")
-    .all(user.id) as { id: string; title: string; body: string; time: string; category: string; unread: number }[]
-  const notices = notifications.slice(0, 3).map((n) => ({
-    id: n.id,
-    title: n.title,
-    body: n.body,
-    time: n.time,
-    category: n.category,
-    unread: n.unread === 1,
-  }))
+    .prepare(
+      `SELECT n.id, n.title, n.body, n.time, n.category, n.created_at,
+        CASE WHEN nr.user_id IS NOT NULL THEN 0 ELSE 1 END as unread
+       FROM notifications n
+       LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ?
+       WHERE ((n.user_id IS NULL AND (n.target_role IS NULL OR n.target_role = ?)) OR n.user_id = ?)
+       ORDER BY CASE n.category WHEN 'alert' THEN 0 WHEN 'academic' THEN 1 WHEN 'event' THEN 2 ELSE 3 END, n.created_at DESC
+       LIMIT 3`,
+    )
+    .all(user.id, user.role, user.id) as { id: string; title: string; body: string; time: string; category: string; created_at: string; unread: number }[]
+  const notices = notifications
+    .filter((n) => n.unread === 1)
+    .map((n) => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      time: n.time,
+      category: n.category,
+      unread: true,
+      createdAt: n.created_at || undefined,
+    }))
 
   const checkIns = db
-    .prepare("SELECT user_id, name, role, time, status, method, source FROM check_ins WHERE substr(created_at, 1, 10) = ?")
+    .prepare("SELECT c.user_id, u.name, u.role, c.time, c.status, c.method, c.source FROM check_ins c JOIN users u ON u.id = c.user_id WHERE substr(c.created_at, 1, 10) = ?")
     .all(today) as {
     user_id: string
     name: string
@@ -57,8 +68,8 @@ export async function GET() {
   const presentCount = checkIns.filter((c) => c.status !== "absent").length
   const avgAttendance = checkIns.length > 0 ? Math.round((presentCount / checkIns.length) * 100) : 0
 
-  const studentIds = db.prepare("SELECT id FROM users WHERE role = 'student'").all() as { id: string }[]
-  const staffCount = (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'staff'").get() as { n: number }).n
+  const studentIds = db.prepare("SELECT id FROM users WHERE role = 'student' AND is_deleted = 0").all() as { id: string }[]
+  const staffCount = (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'staff' AND is_deleted = 0").get() as { n: number }).n
 
   // Live fingerprint device stats from DB
   const fpDevices = db.prepare("SELECT device_id, last_seen, enrolled_count FROM fingerprint_devices").all() as {
@@ -88,7 +99,7 @@ export async function GET() {
         ]
       : user.role === "staff"
         ? [
-            { label: "My mentees", value: db.prepare("SELECT COUNT(*) AS n FROM users WHERE mentor_id = (SELECT id FROM mentors WHERE name = ?)").get(user.name)?.n ?? 0, hint: undefined, tone: "primary" as const, icon: "user" },
+            { label: "My mentees", value: db.prepare("SELECT COUNT(*) AS n FROM users WHERE mentor_id = (SELECT id FROM mentors WHERE name = ?) AND is_deleted = 0").get(user.name)?.n ?? 0, hint: undefined, tone: "primary" as const, icon: "user" },
             { label: "Classes today", value: todaysClasses.filter((s) => s.staff === user.name).length, hint: undefined, tone: "chart-5" as const, icon: "calendar" },
             { label: "Present today", value: `${avgAttendance}%`, hint: "across your modules", tone: "success" as const, icon: "shield" },
             { label: "Unread alerts", value: notices.length, hint: undefined, tone: "warning" as const, icon: "bell" },
@@ -105,7 +116,8 @@ export async function GET() {
       ? []
       : db
           .prepare(
-            `SELECT c.user_id, c.name, c.time, c.status FROM check_ins c
+            `SELECT c.user_id, u.name, c.time, c.status FROM check_ins c
+             JOIN users u ON u.id = c.user_id
              WHERE c.status != 'absent' AND substr(c.created_at, 1, 10) = ? ORDER BY c.created_at DESC LIMIT 5`,
           )
           .all(today)

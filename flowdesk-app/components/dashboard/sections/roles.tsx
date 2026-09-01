@@ -382,6 +382,12 @@ function OverridesTab() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             type="search"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered.length > 0) {
+                e.preventDefault()
+                setSelectedId(filtered[0].id)
+              }
+            }}
             placeholder="Search people…"
             aria-label="Search people"
             className="w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"

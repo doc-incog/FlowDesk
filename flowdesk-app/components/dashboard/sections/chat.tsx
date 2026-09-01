@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { MessageSquare, Plus, Send, Search, Trash2 } from "lucide-react"
+import { MessageSquare, EyeOff, Plus, Send, Search, Trash2 } from "lucide-react"
 import type { UserProfile } from "@/lib/seed-data/core"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
 
-type Participant = { id: string; name: string; avatarInitials: string; role: string }
+type Participant = { id: string; name: string; avatarInitials: string; role: string; deleted?: boolean }
 
 type Conversation = {
   id: string
@@ -18,6 +18,7 @@ type Conversation = {
   lastSenderId: string
   lastMessageAt: string
   unreadCount: number
+  hidden?: boolean
   participants: Participant[]
 }
 
@@ -65,7 +66,9 @@ export function ChatSection({ role }: { role: string }) {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([])
   const [searching, setSearching] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [confirmingHideId, setConfirmingHideId] = useState<string | null>(null)
   const [sidebarFilter, setSidebarFilter] = useState("")
+  const [hiddenConversations, setHiddenConversations] = useState<Conversation[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -76,12 +79,16 @@ export function ChatSection({ role }: { role: string }) {
     let alive = true
     Promise.all([
       fetch("/api/conversations").then((r) => r.json()),
+      fetch("/api/conversations?includeHidden=true").then((r) => r.json()),
       fetch("/api/auth/me").then((r) => r.json()),
     ])
-      .then(([conv, auth]) => {
+      .then(([conv, hidden, auth]) => {
         if (!alive) return
         if (conv?.error) setError(conv.error)
         else setConversations(conv.conversations ?? [])
+        if (hidden?.conversations) {
+          setHiddenConversations(hidden.conversations.filter((c: Conversation) => c.hidden))
+        }
         if (auth?.user) setMe(auth.user)
         else if (auth?.error && !conv?.error) setError(auth.error)
       })
@@ -94,15 +101,21 @@ export function ChatSection({ role }: { role: string }) {
 
   const refreshConversations = useCallback(async () => {
     try {
-      const res = await fetch("/api/conversations")
+      const [res, resHidden] = await Promise.all([
+        fetch("/api/conversations"),
+        fetch("/api/conversations?includeHidden=true"),
+      ])
       const d = await res.json()
       if (d?.conversations) setConversations(d.conversations)
+      const dHidden = await resHidden.json()
+      if (dHidden?.conversations) {
+        setHiddenConversations(dHidden.conversations.filter((c: Conversation) => c.hidden))
+      }
     } catch {
-      // Sidebar refreshes on the next poll
+
     }
   }, [])
 
-  // Keep the sidebar live: new conversations, unread badges, last messages.
   useEffect(() => {
     let alive = true
     const timer = setInterval(() => {
@@ -124,7 +137,6 @@ export function ChatSection({ role }: { role: string }) {
         .then((d) => {
           if (!alive || !d?.messages) return
           setMessages((prev) => {
-            // Skip state churn when nothing changed so polling doesn't fight scrolling.
             const last = d.messages[d.messages.length - 1]
             if (
               prev.length === d.messages.length &&
@@ -136,7 +148,7 @@ export function ChatSection({ role }: { role: string }) {
             return d.messages
           })
         })
-        .catch(() => {})
+        .catch(() => { })
     }
     poll()
     const timer = setInterval(poll, 2000)
@@ -225,7 +237,7 @@ export function ChatSection({ role }: { role: string }) {
         )
       }
     } catch {
-      // Will be caught on next poll
+
     } finally {
       setSending(false)
     }
@@ -233,13 +245,38 @@ export function ChatSection({ role }: { role: string }) {
 
   const activeConversation = conversations.find((c) => c.id === activeId)
 
-  // Deleting a conversation removes it for everyone, so clear the open thread
-  // if it is the one being deleted.
+  const otherDeleted =
+    activeConversation?.type === "direct" &&
+    (activeConversation.participants.find((p) => p.id !== me?.id)?.deleted ?? false)
+
+
+  const hideConversation = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}?action=hide`, { method: "DELETE" })
+    } catch {
+    }
+    setConfirmingHideId(null)
+    if (activeId === id) {
+      setActiveId(null)
+      setMessages([])
+    }
+    refreshConversations()
+  }
+
+  const unhideConversation = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}?action=unhide`, { method: "DELETE" })
+    } catch {
+    }
+    loadMessages(id)
+    refreshConversations()
+  }
+
   const deleteConversation = async (id: string) => {
     try {
-      await fetch(`/api/conversations/${id}`, { method: "DELETE" })
+      await fetch(`/api/conversations/${id}?action=delete`, { method: "DELETE" })
     } catch {
-      // The sidebar refresh below will reconcile the list
+
     }
     setConfirmingDeleteId(null)
     if (activeId === id) {
@@ -317,6 +354,12 @@ export function ChatSection({ role }: { role: string }) {
                 type="search"
                 value={sidebarFilter}
                 onChange={(e) => setSidebarFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return
+                  const q = sidebarFilter.trim().toLowerCase()
+                  const visible = q ? conversations.filter((c) => c.title.toLowerCase().includes(q) || c.participants.some((p) => p.name.toLowerCase().includes(q)) || (c.lastMessage ?? "").toLowerCase().includes(q)) : conversations
+                  if (visible.length > 0) loadMessages(visible[0].id)
+                }}
                 placeholder="Search conversations…"
                 aria-label="Search conversations"
                 className="w-full rounded-sm border border-input bg-card py-2 pl-8 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -324,7 +367,7 @@ export function ChatSection({ role }: { role: string }) {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 && (
+            {conversations.length === 0 && hiddenConversations.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-4 py-12 text-center text-sm text-muted-foreground">
                 <MessageSquare className="h-6 w-6" aria-hidden />
                 <p>No conversations yet.</p>
@@ -333,15 +376,17 @@ export function ChatSection({ role }: { role: string }) {
             )}
             {(() => {
               const q = sidebarFilter.trim().toLowerCase()
+              const matches = (c: Conversation) =>
+                c.title.toLowerCase().includes(q) ||
+                c.participants.some((p) => p.name.toLowerCase().includes(q)) ||
+                (c.lastMessage ?? "").toLowerCase().includes(q)
+              // When searching, also surface hidden conversations that match so a
+              // hidden chat can be reopened directly instead of via "New chat".
               const visible = q
-                ? conversations.filter(
-                    (c) =>
-                      c.title.toLowerCase().includes(q) ||
-                      c.participants.some((p) => p.name.toLowerCase().includes(q)) ||
-                      (c.lastMessage ?? "").toLowerCase().includes(q),
-                  )
+                ? conversations.filter(matches).concat(hiddenConversations.filter(matches))
                 : conversations
-              if (conversations.length > 0 && visible.length === 0) {
+              const total = conversations.length + hiddenConversations.length
+              if (total > 0 && visible.length === 0) {
                 return (
                   <p className="px-4 py-8 text-center text-sm text-muted-foreground">No conversations match.</p>
                 )
@@ -350,17 +395,25 @@ export function ChatSection({ role }: { role: string }) {
                 const other = conv.participants.find((p) => p.id !== me?.id)
                 const isActive = conv.id === activeId
                 const confirmingDelete = confirmingDeleteId === conv.id
+                const confirmingHide = confirmingHideId === conv.id
+                const confirming = confirmingDelete || confirmingHide
+                const openConv = () => {
+                  if (confirmingDeleteId && confirmingDeleteId !== conv.id) setConfirmingDeleteId(null)
+                  if (confirmingHideId && confirmingHideId !== conv.id) setConfirmingHideId(null)
+                  if (conv.hidden) {
+                    unhideConversation(conv.id)
+                  } else {
+                    loadMessages(conv.id)
+                  }
+                }
                 return (
                   <div
                     key={conv.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => {
-                      if (confirmingDeleteId && confirmingDeleteId !== conv.id) setConfirmingDeleteId(null)
-                      loadMessages(conv.id)
-                    }}
+                    onClick={openConv}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") loadMessages(conv.id)
+                      if (e.key === "Enter") openConv()
                     }}
                     className={cn(
                       "group flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-3 text-left transition-colors",
@@ -375,8 +428,13 @@ export function ChatSection({ role }: { role: string }) {
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">
                           {other?.name ?? conv.title}
+                          {conv.hidden && (
+                            <span className="ml-1.5 rounded-sm border border-border bg-secondary px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Hidden
+                            </span>
+                          )}
                         </p>
-                        {conv.lastMessageAt && (
+                        {conv.lastMessageAt && !confirming && (
                           <span className="shrink-0 text-[10px] text-muted-foreground">
                             {relativeTime(conv.lastMessageAt)}
                           </span>
@@ -385,8 +443,10 @@ export function ChatSection({ role }: { role: string }) {
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-xs text-muted-foreground">
                           {confirmingDelete
-                            ? "Delete for everyone?"
-                            : conv.lastMessage || "No messages yet"}
+                            ? "Delete permanently?"
+                            : confirmingHide
+                              ? "Hide conversation?"
+                              : conv.lastMessage || "No messages yet"}
                         </p>
                         {confirmingDelete ? (
                           <span className="flex shrink-0 items-center gap-1">
@@ -410,24 +470,62 @@ export function ChatSection({ role }: { role: string }) {
                               No
                             </button>
                           </span>
-                        ) : (
-                          <>
-                            {conv.unreadCount > 0 && (
-                              <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                                {conv.unreadCount}
-                              </span>
-                            )}
+                        ) : confirmingHide ? (
+                          <span className="flex shrink-0 items-center gap-1">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setConfirmingDeleteId(conv.id)
+                                hideConversation(conv.id)
                               }}
-                              aria-label={`Delete conversation with ${other?.name ?? conv.title}`}
-                              title="Delete conversation (for everyone)"
-                              className="hidden shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive group-hover:block"
+                              className="rounded-sm bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground"
                             >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              Hide
                             </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setConfirmingHideId(null)
+                              }}
+                              aria-label="Cancel hide"
+                              className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                            >
+                              No
+                            </button>
+                          </span>
+                        ) : (
+                          <>
+                            {conv.unreadCount > 0 && (
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+                                <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                                  {conv.unreadCount}
+                                </span>
+                              </span>
+                            )}
+                            <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmingHideId(conv.id)
+                                }}
+                                aria-label={`Hide conversation with ${other?.name ?? conv.title}`}
+                                title="Hide conversation"
+                                className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmingDeleteId(conv.id)
+                                }}
+                                aria-label={`Delete conversation with ${other?.name ?? conv.title}`}
+                                title="Delete permanently"
+                                className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            </span>
                           </>
                         )}
                       </div>
@@ -499,30 +597,36 @@ export function ChatSection({ role }: { role: string }) {
 
               {/* Input bar */}
               <div className="border-t border-border px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        sendMessage()
-                      }
-                    }}
-                    rows={1}
-                    placeholder="Type a message…"
-                    aria-label="Message input"
-                    className="min-h-[40px] max-h-[120px] w-full resize-none rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || sending}
-                    aria-label="Send message"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    <Send className="h-4 w-4" aria-hidden />
-                  </button>
-                </div>
+                {otherDeleted ? (
+                  <p className="rounded-lg border border-border bg-secondary/40 px-3 py-2.5 text-center text-xs text-muted-foreground">
+                    This user is no longer available — the conversation is read-only.
+                  </p>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          sendMessage()
+                        }
+                      }}
+                      rows={1}
+                      placeholder="Type a message…"
+                      aria-label="Message input"
+                      className="min-h-[40px] max-h-[120px] w-full resize-none rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || sending}
+                      aria-label="Send message"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

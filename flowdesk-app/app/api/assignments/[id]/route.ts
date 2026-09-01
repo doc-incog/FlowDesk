@@ -4,7 +4,6 @@ import { getDb } from "@/lib/db"
 
 export const runtime = "nodejs"
 
-/** Deletes an assignment and its submissions (staff/admin). */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

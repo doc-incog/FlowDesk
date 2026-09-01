@@ -29,11 +29,28 @@ export async function POST(request: Request) {
   if (!scholarship) return NextResponse.json({ error: "Scholarship not found" }, { status: 404 })
 
   const existing = db
-    .prepare("SELECT id FROM scholarship_applications WHERE scholarship_id = ? AND student_id = ?")
+    .prepare(
+      "SELECT id FROM scholarship_applications WHERE scholarship_id = ? AND student_id = ? AND status != 'withdrawn'",
+    )
     .get(scholarshipId, user.id) as { id: string } | undefined
   if (existing) {
     return NextResponse.json(
       { error: "You have already applied for this scholarship" },
+      { status: 409 },
+    )
+  }
+
+  // Only one application may be pending at a time: once a student has an
+  // application in "submitted" or "under-review", they cannot submit for a
+  // different scholarship until the admin has approved or rejected it.
+  const pending = db
+    .prepare(
+      "SELECT id FROM scholarship_applications WHERE student_id = ? AND status IN ('submitted', 'under-review')",
+    )
+    .get(user.id) as { id: string } | undefined
+  if (pending) {
+    return NextResponse.json(
+      { error: "You already have a pending scholarship application. Wait for it to be reviewed before applying again." },
       { status: 409 },
     )
   }

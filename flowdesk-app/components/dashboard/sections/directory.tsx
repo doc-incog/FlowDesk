@@ -141,6 +141,13 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           type="search"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && filtered.length > 0) {
+              e.preventDefault()
+              select(filtered[0])
+              setQuery("")
+            }
+          }}
           placeholder={`Search ${kind}…`}
           aria-label="Search people"
           className="w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
@@ -151,6 +158,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
         <PersonForm
           kind={kind}
           roles={roles}
+          mentors={mentors}
           onDone={(changed) => {
             setAdding(false)
             if (changed) setTick((t) => t + 1)
@@ -192,6 +200,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                   kind={kind}
                   roles={roles}
                   person={selected}
+                  mentors={mentors}
                   onDone={(changed) => {
                     setEditing(false)
                     if (changed) setTick((t) => t + 1)
@@ -250,8 +259,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                     confirmingDelete ? (
                       <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
                         <p className="text-sm">
-                          Delete <b>{selected.name}</b>? This removes their account, attendance and chat
-                          history. Fees already paid and results are kept.
+                          Are you sure you want to delete <b>{selected.name}</b>?
                         </p>
                         {deleteError && (
                           <p role="alert" className="text-sm text-destructive">{deleteError}</p>
@@ -300,11 +308,13 @@ function PersonForm({
   kind,
   roles,
   person,
+  mentors,
   onDone,
 }: {
   kind: "students" | "staff"
   roles: RoleOption[]
   person?: UserProfile
+  mentors: Mentor[]
   onDone: (changed: boolean) => void
 }) {
   const [form, setForm] = useState<Record<string, string>>(() => ({
@@ -370,11 +380,17 @@ function PersonForm({
           <input type="email" className={inputCls} value={form.email} onChange={(e) => set("email")(e.target.value)} />
         </Field>
         <Field label="Role">
-          <select className={inputCls} value={form.role} onChange={(e) => set("role")(e.target.value)}>
-            {roles.map((r) => (
-              <option key={r.key} value={r.key}>{r.label}</option>
-            ))}
-          </select>
+          {person ? (
+            <select className={inputCls} value={form.role} onChange={(e) => set("role")(e.target.value)}>
+              {roles.map((r) => (
+                <option key={r.key} value={r.key}>{r.label}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex h-10 items-center rounded-sm border border-input bg-secondary/50 px-3 text-sm">
+              {kind === "staff" ? "Staff" : "Student"}
+            </div>
+          )}
         </Field>
         <Field label="Department">
           <input className={inputCls} value={form.department} onChange={(e) => set("department")(e.target.value)} />
@@ -402,8 +418,19 @@ function PersonForm({
             <Field label="Batch">
               <input className={inputCls} value={form.batch} onChange={(e) => set("batch")(e.target.value)} />
             </Field>
-            <Field label="Mentor ID">
-              <input className={inputCls} value={form.mentorId} onChange={(e) => set("mentorId")(e.target.value)} />
+            <Field label="Mentor">
+              <select
+                className={cn(inputCls, "bg-card")}
+                value={form.mentorId}
+                onChange={(e) => set("mentorId")(e.target.value)}
+              >
+                <option value="">— No mentor —</option>
+                {mentors.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.id})
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Guardian name">
               <input className={inputCls} value={form.guardianName} onChange={(e) => set("guardianName")(e.target.value)} />

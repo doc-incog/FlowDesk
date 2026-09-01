@@ -1,101 +1,91 @@
 import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { getDb } from "@/lib/db"
-import { localDate } from "@/lib/datetime"
 
 export const runtime = "nodejs"
-
-const EMPTY_SUMMARY = { total: 0, present: 0, late: 0, absent: 0, percentage: 0 }
 
 export async function GET(request: Request) {
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { searchParams } = new URL(request.url)
-  const from = searchParams.get("from")
-  const to = searchParams.get("to")
-  const roleFilter = searchParams.get("role") // optional: "student" | "staff"
-  const personId = searchParams.get("userId") // optional: per-person history
+  const url = new URL(request.url)
+  const from = url.searchParams.get("from") ?? ""
+  const to = url.searchParams.get("to") ?? ""
+  const userId = url.searchParams.get("userId") ?? ""
+  const roleFilter = url.searchParams.get("role") ?? ""
+  const name = url.searchParams.get("name") ?? ""
 
   const db = getDb()
 
-  let query = `SELECT id, user_id, name, role, time, status, method, source, created_at FROM check_ins`
+  // Build dynamic WHERE clauses
   const conditions: string[] = []
-  const params: (string | number)[] = []
+  const params: string[] = []
 
-  // Staff can only see their own mentees. Resolve them up front so the same
-  // set also authorises per-person lookups.
-  let menteeIds: string[] | null = null
-  if (user.role === "student") {
-    // Students only see their own records
-    conditions.push("user_id = ?")
-    params.push(user.id)
-  } else if (user.role === "staff") {
-    // Find the mentor record matching this staff member's name
-    const mentorRow = db
-      .prepare("SELECT id FROM mentors WHERE name = ?")
-      .get(user.name) as { id: string } | undefined
-
-    menteeIds = mentorRow
-      ? (db.prepare("SELECT id FROM users WHERE mentor_id = ?").all(mentorRow.id) as { id: string }[]).map(
-          (r) => r.id,
-        )
-      : []
-
-    if (menteeIds.length === 0) {
-      return NextResponse.json({ date: localDate(), records: [], summary: EMPTY_SUMMARY })
-    }
-  }
-  // Admin sees all records unless a specific person is requested
-
-  // Per-person history: admins may query anyone, staff only their mentees.
-  if (personId) {
-    if (user.role === "admin") {
-      const target = db.prepare("SELECT id FROM users WHERE id = ?").get(personId)
-      if (!target) return NextResponse.json({ error: "Person not found" }, { status: 404 })
-    } else if (user.role === "staff") {
-      if (!menteeIds!.includes(personId)) {
-        return NextResponse.json({ error: "You can only view your mentees' attendance" }, { status: 403 })
-      }
-    } else {
-      // Students are always scoped to themselves below
-    }
-    conditions.push("user_id = ?")
-    params.push(personId)
-  } else if (menteeIds) {
-    const placeholders = menteeIds.map(() => "?").join(",")
-    conditions.push(`user_id IN (${placeholders})`)
-    params.push(...menteeIds)
-  }
-
-  // Optional role filter (admin only, ignored when a specific person is chosen)
-  if (!personId && roleFilter && user.role === "admin" && (roleFilter === "student" || roleFilter === "staff")) {
-    conditions.push("role = ?")
-    params.push(roleFilter)
-  }
-
-  // Date range filtering
   if (from) {
-    conditions.push("substr(created_at, 1, 10) >= ?")
+    conditions.push("substr(c.created_at, 1, 10) >= ?")
     params.push(from)
   }
   if (to) {
-    conditions.push("substr(created_at, 1, 10) <= ?")
+    conditions.push("substr(c.created_at, 1, 10) <= ?")
     params.push(to)
   }
 
-  if (conditions.length > 0) {
-    query += " WHERE " + conditions.join(" AND ")
+  // Role-based access control
+  if (user.role === "student") {
+    // Students can only see their own records
+    conditions.push("c.user_id = ?")
+    params.push(user.id)
+  } else if (user.role === "staff") {
+    // Staff can only ever see their mentees' records
+    if (userId) {
+      conditions.push("c.user_id = ?")
+      params.push(userId)
+    } else {
+      // Get mentee IDs from the mentor relationship (staff user -> mentors -> students)
+      const mentor = db
+        .prepare("SELECT id FROM mentors WHERE name = ? OR id = ?")
+        .get(user.name, user.mentorId ?? "") as { id: string } | undefined
+      if (!mentor) {
+        return NextResponse.json({ records: [], summary: { total: 0, present: 0, late: 0, absent: 0, percentage: 0 } })
+      }
+      const menteeIds = db
+        .prepare("SELECT id FROM users WHERE mentor_id = ? AND is_deleted = 0")
+        .all(mentor.id) as { id: string }[]
+      if (menteeIds.length === 0) {
+        return NextResponse.json({ records: [], summary: { total: 0, present: 0, late: 0, absent: 0, percentage: 0 } })
+      }
+      conditions.push(`c.user_id IN (${menteeIds.map(() => "?").join(",")})`)
+      params.push(...menteeIds.map((m) => m.id))
+    }
+  } else if (user.role === "admin") {
+    // Admins can see everyone, optionally filtered
+    if (userId) {
+      conditions.push("c.user_id = ?")
+      params.push(userId)
+    } else if (roleFilter && roleFilter !== "all") {
+      conditions.push("c.role = ?")
+      params.push(roleFilter)
+    }
   }
 
-  query += " ORDER BY created_at DESC"
-
-  // Limit to 365 records if no date range specified
-  if (!from && !to) {
-    query += " LIMIT 365"
+  // Optional name filter (scoped within the role logic above)
+  if (name) {
+    conditions.push("u.name LIKE ?")
+    params.push(`%${name}%`)
   }
 
-  const rows = db.prepare(query).all(...params) as {
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.user_id, u.name, u.role, c.time, c.status, c.method, c.source, c.created_at
+       FROM check_ins c
+       JOIN users u ON u.id = c.user_id
+       ${whereClause}
+       ORDER BY c.created_at DESC
+       LIMIT 500`,
+    )
+    .all(...params) as {
     id: string
     user_id: string
     name: string
@@ -112,9 +102,9 @@ export async function GET(request: Request) {
     userId: r.user_id,
     name: r.name,
     role: r.role,
-    date: r.created_at.substring(0, 10),
+    date: r.created_at.slice(0, 10),
     time: r.time,
-    status: r.status,
+    status: r.status as "on-time" | "late" | "absent",
     method: r.method,
     source: r.source,
   }))
@@ -123,8 +113,7 @@ export async function GET(request: Request) {
   const present = records.filter((r) => r.status === "on-time").length
   const late = records.filter((r) => r.status === "late").length
   const absent = records.filter((r) => r.status === "absent").length
-  const attended = present + late
-  const percentage = total > 0 ? Math.round((attended / total) * 100) : 0
+  const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0
 
   return NextResponse.json({
     records,

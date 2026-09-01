@@ -20,7 +20,11 @@ type Scholarship = {
   description: string
 }
 
-type ScholarshipStatus = "submitted" | "under-review" | "approved" | "rejected"
+type ScholarshipStatus = "submitted" | "under-review" | "approved" | "rejected" | "withdrawn"
+
+// A supporting document is either a plain label (seed data) or an uploaded
+// file with { name, path } metadata (real applications).
+type DocEntry = { name: string; path?: string }
 
 type ScholarshipApplication = {
   id: string
@@ -29,17 +33,63 @@ type ScholarshipApplication = {
   studentName: string
   status: ScholarshipStatus
   submittedAt: string
-  docs: string[]
+  docs: DocEntry[]
 }
 
-function normalizeDocs(docs: string[] | string): string[] {
-  if (Array.isArray(docs)) return docs
-  try {
-    const parsed = JSON.parse(docs)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
+function normalizeDocs(docs: DocEntry[] | string | unknown): DocEntry[] {
+  if (Array.isArray(docs)) {
+    return docs.map((d) =>
+      typeof d === "string" ? { name: d } : { name: String(d.name ?? "Document"), path: typeof d.path === "string" ? d.path : undefined },
+    )
   }
+  if (typeof docs === "string") {
+    try {
+      const parsed = JSON.parse(docs)
+      if (Array.isArray(parsed)) return normalizeDocs(parsed)
+    } catch {
+      // Fall through to a single-entry list
+    }
+    return docs.trim() ? [{ name: docs }] : []
+  }
+  return []
+}
+
+function docHref(applicationId: string, doc: DocEntry): string | null {
+  if (!doc.path) return null
+  return `/api/scholarships/applications/${applicationId}/docs?file=${encodeURIComponent(doc.name)}`
+}
+
+function DocList({ applicationId, docs }: { applicationId: string; docs: DocEntry[] }) {
+  if (docs.length === 0) return <span>—</span>
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {docs.map((d, i) => {
+        const href = docHref(applicationId, d)
+        const inner = (
+          <>
+            <FileText className="h-3 w-3" aria-hidden />
+            {d.name}
+          </>
+        )
+        return href ? (
+          <a
+            key={`${d.name}-${i}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            title="Open document"
+            className="inline-flex max-w-[220px] items-center gap-1 truncate rounded-sm border border-border bg-secondary/60 px-1.5 py-0.5 text-xs text-primary underline-offset-2 hover:underline"
+          >
+            {inner}
+          </a>
+        ) : (
+          <span key={`${d.name}-${i}`} className="inline-flex max-w-[220px] items-center gap-1 truncate rounded-sm border border-border bg-secondary/60 px-1.5 py-0.5 text-xs text-muted-foreground">
+            {inner}
+          </span>
+        )
+      })}
+    </span>
+  )
 }
 
 const TABS: TabItem[] = [
@@ -52,6 +102,7 @@ const STATUS_BADGE: Record<ScholarshipStatus, string> = {
   "under-review": "pill bg-warning/15 text-warning",
   approved: "pill bg-success/10 text-success",
   rejected: "pill bg-destructive/10 text-destructive",
+  withdrawn: "pill bg-muted text-muted-foreground",
 }
 
 const STATUS_LABEL: Record<ScholarshipStatus, string> = {
@@ -59,6 +110,7 @@ const STATUS_LABEL: Record<ScholarshipStatus, string> = {
   "under-review": "Under review",
   approved: "Approved",
   rejected: "Rejected",
+  withdrawn: "Withdrawn",
 }
 
 export function ScholarshipsSection({ role }: { role: Role }) {
@@ -141,7 +193,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
   }
 
   if (role === "admin") {
-    return <AdminScholarships applications={applications} setApplications={setApplications} scholarships={scholarships} />
+    return <AdminScholarships applications={applications} setApplications={setApplications} scholarships={scholarships} setScholarships={setScholarships} />
   }
 
   return (
@@ -163,7 +215,7 @@ export function ScholarshipsSection({ role }: { role: Role }) {
           </div>
         )
       ) : (
-        <StudentApplications applications={applications} scholarships={scholarships} me={me} />
+        <StudentApplications applications={applications} setApplications={setApplications} scholarships={scholarships} me={me} />
       )}
       {!isStudent && (
         <p className="text-sm text-muted-foreground">
@@ -276,14 +328,17 @@ function ScholarshipCard({ s, canApply, onApply }: { s: Scholarship; canApply: b
 
 function StudentApplications({
   applications,
+  setApplications,
   scholarships,
   me,
 }: {
   applications: ScholarshipApplication[]
+  setApplications: React.Dispatch<React.SetStateAction<ScholarshipApplication[]>>
   scholarships: Scholarship[]
   me: UserProfile
 }) {
   const mine = applications.filter((a) => a.studentId === me.id)
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null)
 
   if (mine.length === 0) {
     return (
@@ -293,21 +348,49 @@ function StudentApplications({
     )
   }
 
+  const withdraw = async (id: string) => {
+    setWithdrawingId(id)
+    try {
+      const res = await fetch(`/api/scholarships/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "withdrawn" }),
+      })
+      if (res.ok) {
+        setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status: "withdrawn" as const } : a)))
+      }
+    } catch {
+      // Status refreshes on next visit
+    } finally {
+      setWithdrawingId(null)
+    }
+  }
+
   return (
     <div className="space-y-3">
       {mine.map((a) => {
         const s = scholarships.find((x) => x.id === a.scholarshipId)
+        const canWithdraw = a.status === "submitted" || a.status === "under-review"
         return (
           <Card key={a.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{s?.name ?? a.id}</p>
               <p className="text-xs text-muted-foreground">
-                {a.id} · Submitted {a.submittedAt} · Docs: {a.docs.join(", ") || "—"}
+                {a.id} · Submitted {a.submittedAt} · <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" aria-hidden /> Docs:</span>{" "}<DocList applicationId={a.id} docs={a.docs} />
               </p>
             </div>
             <span className={cn("self-start", STATUS_BADGE[a.status])}>
               {STATUS_LABEL[a.status]}
             </span>
+            {canWithdraw && (
+              <button
+                onClick={() => { if (window.confirm("Withdraw this application?")) withdraw(a.id) }}
+                disabled={withdrawingId === a.id}
+                className="self-start rounded-sm border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-40"
+              >
+                {withdrawingId === a.id ? "Withdrawing…" : "Withdraw"}
+              </button>
+            )}
           </Card>
         )
       })}
@@ -319,18 +402,71 @@ function AdminScholarships({
   applications,
   setApplications,
   scholarships,
+  setScholarships,
 }: {
   applications: ScholarshipApplication[]
   setApplications: React.Dispatch<React.SetStateAction<ScholarshipApplication[]>>
   scholarships: Scholarship[]
+  setScholarships: React.Dispatch<React.SetStateAction<Scholarship[]>>
 }) {
   const [filter, setFilter] = useState<"all" | ScholarshipStatus>("all")
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState("")
+  const [savingScholarship, setSavingScholarship] = useState(false)
+  const [form, setForm] = useState({
+    name: "",
+    provider: "",
+    amount: "",
+    eligibility: "",
+    seats: "",
+    deadline: "",
+    description: "",
+  })
   const list = applications.filter((a) => filter === "all" || a.status === filter)
   const counts = {
     total: applications.length,
     approved: applications.filter((a) => a.status === "approved").length,
     pending: applications.filter((a) => a.status === "submitted" || a.status === "under-review").length,
   }
+
+  const createScholarship = async () => {
+    setSavingScholarship(true)
+    setCreateError("")
+    try {
+      const res = await fetch("/api/scholarships", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          provider: form.provider.trim(),
+          amount: Number(form.amount),
+          eligibility: form.eligibility.trim(),
+          seats: Number(form.seats),
+          deadline: form.deadline.trim(),
+          description: form.description.trim(),
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setCreateError(d?.error ?? "Could not create the scholarship.")
+        return
+      }
+      if (d?.scholarship) {
+        setScholarships((prev) => [d.scholarship, ...prev])
+      }
+      setCreating(false)
+      setForm({ name: "", provider: "", amount: "", eligibility: "", seats: "", deadline: "", description: "" })
+    } catch {
+      setCreateError("Network error while creating the scholarship.")
+    } finally {
+      setSavingScholarship(false)
+    }
+  }
+
+  const inputCls =
+    "w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
+
+  const setField = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const setStatus = async (id: string, status: ScholarshipStatus) => {
     try {
@@ -352,6 +488,14 @@ function AdminScholarships({
       <SectionHeading
         title="Scholarship applications"
         description="Review and approve scholarship applications from the review queue."
+        action={
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" aria-hidden /> New scholarship
+          </button>
+        }
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total applications" value={counts.total} icon={<FileText className="h-5 w-5" />} tone="primary" />
@@ -360,7 +504,7 @@ function AdminScholarships({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["all", "submitted", "under-review", "approved", "rejected"] as const).map((f) => (
+        {(["all", "submitted", "under-review", "approved", "rejected", "withdrawn"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -390,19 +534,22 @@ function AdminScholarships({
                 <p className="font-mono text-xs text-muted-foreground">
                   {a.id} · {s?.name ?? a.scholarshipId} · {s ? `Rs. ${s.amount.toLocaleString("en-NP")}` : ""}
                 </p>
-                <p className="text-xs text-muted-foreground">Submitted {a.submittedAt} · {a.docs.join(", ")}</p>
+                <p className="text-xs text-muted-foreground">Submitted {a.submittedAt} ·{" "}
+                  <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" aria-hidden /> Docs:</span>{" "}
+                  <DocList applicationId={a.id} docs={a.docs} />
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => setStatus(a.id, "approved")}
-                  disabled={a.status === "approved"}
+                  disabled={a.status === "approved" || a.status === "withdrawn"}
                   className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   <CheckCircle2 className="h-4 w-4" aria-hidden /> Approve
                 </button>
                 <button
                   onClick={() => setStatus(a.id, "rejected")}
-                  disabled={a.status === "rejected"}
+                  disabled={a.status === "rejected" || a.status === "withdrawn"}
                   className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
                 >
                   <XCircle className="h-4 w-4" aria-hidden /> Reject
@@ -415,6 +562,65 @@ function AdminScholarships({
           <Card className="py-10 text-center text-sm text-muted-foreground">No applications in this view.</Card>
         )}
       </div>
+
+      <Modal
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Create scholarship"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Name">
+              <input className={inputCls} value={form.name} onChange={(e) => setField("name")(e.target.value)} placeholder="e.g. Merit Scholarship 2026" />
+            </Field>
+            <Field label="Provider">
+              <input className={inputCls} value={form.provider} onChange={(e) => setField("provider")(e.target.value)} placeholder="e.g. University Grants Commission" />
+            </Field>
+            <Field label="Amount (Rs.)">
+              <input type="number" min={0} className={inputCls} value={form.amount} onChange={(e) => setField("amount")(e.target.value)} placeholder="e.g. 50000" />
+            </Field>
+            <Field label="Seats">
+              <input type="number" min={1} className={inputCls} value={form.seats} onChange={(e) => setField("seats")(e.target.value)} placeholder="e.g. 10" />
+            </Field>
+            <Field label="Deadline">
+              <input type="date" className={cn(inputCls, "font-mono")} value={form.deadline} onChange={(e) => setField("deadline")(e.target.value)} />
+            </Field>
+            <Field label="Eligibility">
+              <input className={inputCls} value={form.eligibility} onChange={(e) => setField("eligibility")(e.target.value)} placeholder="e.g. CGPA 3.5+, Nepali citizens" />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Description">
+                <textarea className={cn(inputCls, "min-h-20 resize-y")} value={form.description} onChange={(e) => setField("description")(e.target.value)} placeholder="Short description shown to students." />
+              </Field>
+            </div>
+          </div>
+          {createError && <p role="alert" className="text-sm text-destructive">{createError}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setCreating(false)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={createScholarship}
+              disabled={savingScholarship || !form.name.trim() || !form.deadline.trim()}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" aria-hidden /> {savingScholarship ? "Creating…" : "Create scholarship"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
   )
 }

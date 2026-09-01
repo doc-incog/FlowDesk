@@ -9,6 +9,8 @@ export const SECTION_KEYS = [
   "students",
   "staff",
   "mentor",
+  "mentees",
+  "withdrawals",
   "chat",
   "schedule",
   "exams",

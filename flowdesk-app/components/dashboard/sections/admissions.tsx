@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, FileText, UserPlus, XCircle } from "lucide-react"
+import { CheckCircle2, FileText, Plus, Trash2, UserPlus, XCircle } from "lucide-react"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
+import { Modal } from "@/components/ui/modal"
 
 type AdmissionStatus = "submitted" | "reviewing" | "accepted" | "rejected"
 
@@ -23,6 +24,9 @@ type AdmissionApplication = {
 type Program = {
   id: string
   name: string
+  duration: string
+  seats: number
+  deadline: string
   fee: number
 }
 
@@ -63,6 +67,17 @@ export function AdmissionsSection() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | AdmissionStatus>("all")
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [showAddProgram, setShowAddProgram] = useState(false)
+  const [programError, setProgramError] = useState<string | null>(null)
+  const [addingProgram, setAddingProgram] = useState(false)
+  const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null)
+  const [programForm, setProgramForm] = useState({
+    name: "",
+    duration: "4 years",
+    seats: 60,
+    deadline: "",
+    fee: 0,
+  })
 
   useEffect(() => {
     let alive = true
@@ -106,6 +121,52 @@ export function AdmissionsSection() {
     const next = nextAdmissionStatus(a.status)
     if (!next) return
     setStatus(a.id, next, next === "accepted" ? "Offer letter ready." : a.notes)
+  }
+
+  const addProgram = async () => {
+    if (!programForm.name.trim() || !programForm.deadline.trim()) {
+      setProgramError("Course name and deadline are required.")
+      return
+    }
+    setAddingProgram(true)
+    setProgramError(null)
+    try {
+      const res = await fetch("/api/admissions/programs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(programForm),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setProgramError(d?.error ?? "Could not add the course.")
+        return
+      }
+      if (d?.program) setPrograms((prev) => [...prev, d.program as Program])
+      setShowAddProgram(false)
+      setProgramForm({ name: "", duration: "4 years", seats: 60, deadline: "", fee: 0 })
+    } catch {
+      setProgramError("Network error while adding the course.")
+    } finally {
+      setAddingProgram(false)
+    }
+  }
+
+  const deleteProgram = async (id: string) => {
+    setDeletingProgramId(id)
+    setProgramError(null)
+    try {
+      const res = await fetch(`/api/admissions/programs/${id}`, { method: "DELETE" })
+      const d = await res.json()
+      if (!res.ok) {
+        setProgramError(d?.error ?? "Could not delete the course.")
+        return
+      }
+      setPrograms((prev) => prev.filter((p) => p.id !== id))
+    } catch {
+      setProgramError("Network error while deleting the course.")
+    } finally {
+      setDeletingProgramId(null)
+    }
   }
 
   return (
@@ -212,6 +273,120 @@ export function AdmissionsSection() {
           </Card>
         )}
       </div>
+
+      {/* Courses / Programs management (admin only) */}
+      <Card className="space-y-4">
+        <SectionHeading
+          title="Courses & programs"
+          description="Manage the courses shown to applicants on the admission form."
+          action={
+            <button
+              onClick={() => {
+                setProgramError(null)
+                setShowAddProgram(true)
+              }}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Add course
+            </button>
+          }
+        />
+        {programError && (
+          <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {programError}
+          </p>
+        )}
+        <ul className="divide-y divide-border">
+          {programs.length === 0 && (
+            <li className="py-6 text-center text-sm text-muted-foreground">No courses yet. Add one to start accepting applications.</li>
+          )}
+          {programs.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{p.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {p.id} · {p.duration} · {p.seats} seats · Deadline {p.deadline} · Fee Rs. {p.fee.toLocaleString("en-NP")}
+                </p>
+              </div>
+              <button
+                onClick={() => deleteProgram(p.id)}
+                disabled={deletingProgramId === p.id}
+                className="rounded-sm p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                aria-label={`Delete course ${p.name}`}
+                title="Delete course"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Modal open={showAddProgram} onClose={() => setShowAddProgram(false)} title="Add course">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="pg-name" className="text-sm font-medium">Course name</label>
+            <input
+              id="pg-name"
+              value={programForm.name}
+              onChange={(e) => setProgramForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="B.Tech — Artificial Intelligence"
+              className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="pg-duration" className="text-sm font-medium">Duration</label>
+              <input
+                id="pg-duration"
+                value={programForm.duration}
+                onChange={(e) => setProgramForm((f) => ({ ...f, duration: e.target.value }))}
+                placeholder="4 years"
+                className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="pg-seats" className="text-sm font-medium">Seats</label>
+              <input
+                id="pg-seats"
+                type="number"
+                value={programForm.seats}
+                onChange={(e) => setProgramForm((f) => ({ ...f, seats: Number(e.target.value) }))}
+                className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="pg-deadline" className="text-sm font-medium">Deadline</label>
+              <input
+                id="pg-deadline"
+                value={programForm.deadline}
+                onChange={(e) => setProgramForm((f) => ({ ...f, deadline: e.target.value }))}
+                placeholder="30 Sep 2026"
+                className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="pg-fee" className="text-sm font-medium">Fee (Rs.)</label>
+              <input
+                id="pg-fee"
+                type="number"
+                value={programForm.fee}
+                onChange={(e) => setProgramForm((f) => ({ ...f, fee: Number(e.target.value) }))}
+                className="w-full rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <button
+            onClick={addProgram}
+            disabled={addingProgram}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" aria-hidden /> {addingProgram ? "Adding…" : "Add course"}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

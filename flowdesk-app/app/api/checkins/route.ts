@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       .get(user.name) as { id: string } | undefined
     if (mentorRow) {
       const menteeRows = db
-        .prepare("SELECT id FROM users WHERE mentor_id = ?")
+        .prepare("SELECT id FROM users WHERE mentor_id = ? AND is_deleted = 0")
         .all(mentorRow.id) as { id: string }[]
       menteeIds = menteeRows.map((r) => r.id)
     }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CalendarClock, CheckCircle2, FileText, Paperclip, Plus, Trash2 } from "lucide-react"
+import { CalendarClock, CheckCircle2, Download, FileText, Paperclip, Plus, Trash2 } from "lucide-react"
 import type { Role, ScheduleSlot, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -142,6 +142,8 @@ function MyTasks({
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null)
+  const [confirmWithdrawId, setConfirmWithdrawId] = useState<string | null>(null)
 
   const submit = async () => {
     if (!uploadFor || !file) return
@@ -161,6 +163,22 @@ function MyTasks({
       setSubmitError(err instanceof Error ? err.message : "Upload failed")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const withdraw = async (sub: Submission) => {
+    setWithdrawingId(sub.id)
+    try {
+      const res = await fetch(`/api/submissions/${sub.id}`, { method: "DELETE" })
+      if (res.ok) {
+        setSubmissions((prev) => prev.filter((s) => s.id !== sub.id))
+      }
+    } catch {
+      // Optimistic: remove anyway
+      setSubmissions((prev) => prev.filter((s) => s.id !== sub.id))
+    } finally {
+      setWithdrawingId(null)
+      setConfirmWithdrawId(null)
     }
   }
 
@@ -206,9 +224,27 @@ function MyTasks({
                   <FileText className="h-3.5 w-3.5" aria-hidden /> Max {a.maxMarks} marks
                 </span>
                 {sub?.fileName && (
-                  <span className="flex items-center gap-1">
-                    <Paperclip className="h-3.5 w-3.5" aria-hidden /> {sub.fileName}
-                  </span>
+                  <a
+                    href={`/api/submissions/${sub.id}/file`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-primary hover:underline"
+                    title={`Open ${sub.fileName}`}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" aria-hidden />
+                    <span className="truncate">{sub.fileName}</span>
+                  </a>
+                )}
+                {sub?.fileName && (
+                  <a
+                    href={`/api/submissions/${sub.id}/file?download=1`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-primary"
+                    title={`Download ${sub.fileName}`}
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                  </a>
                 )}
               </div>
             </div>
@@ -221,6 +257,32 @@ function MyTasks({
                   </p>
                   {sub.feedback && <p className="max-w-40 text-xs text-muted-foreground">{sub.feedback}</p>}
                 </div>
+              )}
+              {status === "submitted" && role === "student" && (
+                confirmWithdrawId === sub?.id ? (
+                  <span className="flex items-center gap-1">
+                    <button
+                      onClick={() => sub && withdraw(sub)}
+                      disabled={withdrawingId === sub?.id}
+                      className="rounded-sm bg-destructive px-2 py-1 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {withdrawingId === sub?.id ? "Withdrawing…" : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmWithdrawId(null)}
+                      className="rounded-sm px-2 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmWithdrawId(sub?.id ?? null)}
+                    className="rounded-sm border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
+                  >
+                    Withdraw
+                  </button>
+                )
               )}
               {(status === "pending" || status === "overdue") && role !== "admin" && (
                 <button
@@ -285,16 +347,48 @@ function GradeSubmissions({
   const [assignmentId, setAssignmentId] = useState(assignments[0]?.id ?? "")
   const [marks, setMarks] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState<Record<string, string>>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savedId, setSavedId] = useState<string | null>(null)
   const list = submissions.filter((s) => s.assignmentId === assignmentId)
 
-  const save = (sub: Submission) => {
-    setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === sub.id
-          ? { ...s, marks: marks[sub.id] !== undefined ? Number(marks[sub.id]) : s.marks, feedback: feedback[sub.id] ?? s.feedback }
-          : s,
-      ),
-    )
+  const save = async (sub: Submission) => {
+    setSavingId(sub.id)
+    setSavedId(null)
+    try {
+      const newMarks = marks[sub.id] !== undefined ? Number(marks[sub.id]) : sub.marks
+      const newFeedback = feedback[sub.id] ?? sub.feedback
+      const res = await fetch(`/api/assignments/submissions/${sub.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marks: newMarks !== null && newMarks !== undefined ? newMarks : null,
+          feedback: newFeedback,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data?.submission) {
+        setSubmissions((prev) =>
+          prev.map((s) => (s.id === sub.id ? { ...s, ...data.submission } : s)),
+        )
+        setSavedId(sub.id)
+        setTimeout(() => setSavedId(null), 2000)
+      }
+    } catch {
+      // Optimistic fallback
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s.id === sub.id
+            ? {
+                ...s,
+                marks: marks[sub.id] !== undefined ? Number(marks[sub.id]) : s.marks,
+                feedback: feedback[sub.id] ?? s.feedback,
+              }
+            : s,
+        ),
+      )
+    } finally {
+      setSavingId(null)
+    }
   }
 
   return (
@@ -325,7 +419,27 @@ function GradeSubmissions({
             <Card key={sub.id} className="flex flex-col gap-4 lg:flex-row lg:items-center">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{sub.studentName}</p>
-                <p className="font-mono text-xs text-muted-foreground">{sub.fileName}</p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/api/submissions/${sub.id}/file`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                    title={`Open ${sub.fileName}`}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" aria-hidden />
+                    <span className="truncate">{sub.fileName}</span>
+                  </a>
+                  <a
+                    href={`/api/submissions/${sub.id}/file?download=1`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-muted-foreground hover:text-primary"
+                    title={`Download ${sub.fileName}`}
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </div>
                 <p className="text-xs text-muted-foreground">Submitted {sub.submittedAt}</p>
                 {sub.feedback && <p className="mt-1 text-xs text-muted-foreground">{sub.feedback}</p>}
               </div>
@@ -356,9 +470,10 @@ function GradeSubmissions({
                     />
                     <button
                       onClick={() => save(sub)}
-                      className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                      disabled={savingId === sub.id}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
-                      Save
+                      {savingId === sub.id ? "Saving…" : savedId === sub.id ? "Saved" : "Save"}
                     </button>
                   </>
                 )}

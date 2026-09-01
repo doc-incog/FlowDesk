@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db"
 export const runtime = "nodejs"
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getSessionUser()
@@ -20,51 +20,41 @@ export async function GET(
     .get(id, user.id)
   if (!participant) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const url = new URL(request.url)
-  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 100)
-  const before = url.searchParams.get("before")
-
-  let query = `
-    SELECT m.id, m.sender_id, m.content, m.type, m.created_at, u.name as sender_name, u.avatar_initials
-    FROM messages m
-    JOIN users u ON u.id = m.sender_id
-    WHERE m.conversation_id = ?
-  `
-  const args: (string | number)[] = [id]
-
-  if (before) {
-    query += " AND m.created_at < ?"
-    args.push(before)
-  }
-
-  query += " ORDER BY m.created_at DESC LIMIT ?"
-  args.push(limit)
-
-  const messages = db.prepare(query).all(...args) as {
+  const rows = db
+    .prepare(`
+      SELECT m.id, m.sender_id, u.name as sender_name, u.avatar_initials as sender_initials, u.is_deleted as sender_deleted, m.content, m.type, m.created_at
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.conversation_id = ?
+      ORDER BY m.created_at ASC
+    `)
+    .all(id) as {
     id: string
     sender_id: string
+    sender_name: string
+    sender_initials: string
+    sender_deleted: number
     content: string
     type: string
     created_at: string
-    sender_name: string
-    avatar_initials: string
   }[]
 
-  // Mark as read
+  // Mark conversation as read for this user
   const now = new Date().toISOString()
   db.prepare(
     "UPDATE conversation_participants SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?",
   ).run(now, id, user.id)
 
   return NextResponse.json({
-    messages: messages.reverse().map((m) => ({
-      id: m.id,
-      senderId: m.sender_id,
-      senderName: m.sender_name,
-      senderInitials: m.avatar_initials,
-      content: m.content,
-      type: m.type,
-      createdAt: m.created_at,
+    messages: rows.map((r) => ({
+      id: r.id,
+      senderId: r.sender_id,
+      senderName: r.sender_deleted === 1 ? "Unknown User" : r.sender_name,
+      senderInitials: r.sender_deleted === 1 ? "?" : r.sender_initials,
+      senderDeleted: r.sender_deleted === 1,
+      content: r.content,
+      type: r.type,
+      createdAt: r.created_at,
     })),
   })
 }
@@ -77,6 +67,14 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
+  const db = getDb()
+
+  // Verify user is a participant
+  const participant = db
+    .prepare("SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?")
+    .get(id, user.id)
+  if (!participant) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
   let body: { content?: string } = {}
   try {
     body = await request.json()
@@ -89,14 +87,6 @@ export async function POST(
     return NextResponse.json({ error: "Message content is required" }, { status: 400 })
   }
 
-  const db = getDb()
-
-  // Verify user is a participant
-  const participant = db
-    .prepare("SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?")
-    .get(id, user.id)
-  if (!participant) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-
   const now = new Date().toISOString()
   const msgId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -107,20 +97,23 @@ export async function POST(
   // Update conversation timestamp
   db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(now, id)
 
-  // Mark sender as having read
+  // Update sender's last_read_at so their own message doesn't count as unread
   db.prepare(
     "UPDATE conversation_participants SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?",
   ).run(now, id, user.id)
 
-  return NextResponse.json({
-    message: {
-      id: msgId,
-      senderId: user.id,
-      senderName: user.name,
-      senderInitials: user.avatarInitials,
-      content,
-      type: "text",
-      createdAt: now,
+  return NextResponse.json(
+    {
+      message: {
+        id: msgId,
+        senderId: user.id,
+        senderName: user.name,
+        senderInitials: user.avatarInitials,
+        content,
+        type: "text",
+        createdAt: now,
+      },
     },
-  }, { status: 201 })
+    { status: 201 },
+  )
 }
