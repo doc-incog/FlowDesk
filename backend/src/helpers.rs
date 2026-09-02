@@ -45,7 +45,7 @@ pub fn sort_by_name() -> FindOptions {
 /// `roleSections`: sorted section list for a role.
 pub async fn role_sections(state: &AppState, role: &str) -> Vec<String> {
     let coll = state.db.collection::<Document>("role_permissions");
-    let filter = doc! { "role": role };
+    let filter = doc! { "role_key": role };
     let cursor = coll
         .find(filter, FindOptions::builder().sort(doc! { "section": 1 }).build())
         .await
@@ -96,7 +96,7 @@ pub async fn role_label(state: &AppState, role: &str) -> String {
     state
         .db
         .collection::<Document>("roles")
-        .find_one(doc! { "_id": role }, None)
+        .find_one(doc! { "$or": [ { "key": role }, { "_id": role } ] }, None)
         .await
         .ok()
         .flatten()

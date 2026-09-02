@@ -29,6 +29,7 @@ fn notification_value(d: &Document) -> Value {
         "body": d.get_str("body").ok(),
         "category": d.get_str("category").ok(),
         "read": d.get_bool("read").unwrap_or(false),
+        "unread": !d.get_bool("read").unwrap_or(false),
         "createdAt": d.get_str("created_at").unwrap_or(""),
     })
 }

@@ -38,7 +38,10 @@ async fn list_roles(State(state): State<AppState>, headers: HeaderMap) -> Result
         .await?;
     let mut out = Vec::new();
     while let Some(r) = cursor.try_next().await? {
-        let key = r.get_str("key").unwrap_or_default().to_string();
+        let key = r
+            .get_str("key")
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| r.get_str("_id").map(|s| s.to_string()).unwrap_or_default());
         let builtin = r.get_bool("builtin").unwrap_or(false);
         let mut sections = Vec::new();
         let mut pc = perms
@@ -183,8 +186,8 @@ async fn update_role(
             let old = roles_t.find_one_with_session(doc! { "key": &key }, None, &mut txn).await?;
             if let Some(old) = old {
                 let mut nd = old.clone();
+                nd.insert("key", nk.clone());
                 nd.insert("_id", Bson::String(nk.clone()));
-                nd.remove("key");
                 roles_t.insert_one_with_session(nd, None, &mut txn).await?;
                 roles_t.delete_one_with_session(doc! { "key": &key }, None, &mut txn).await?;
             }
@@ -331,6 +334,16 @@ async fn update_permissions(
         }
     }
 
+    // Echo back the effective override so the client can keep its toggle state.
+    let mut ov = Vec::new();
+    let mut oc = overrides.find(doc! { "user_id": &user_id }, None).await?;
+    while let Some(p) = oc.try_next().await? {
+        if let Some(s) = p.get_str("section").ok() {
+            ov.push(s.to_string());
+        }
+    }
+    let override_value = if ov.is_empty() { Value::Null } else { json!(ov) };
+
     let user_value = helpers::doc_to_user_value(&user);
-    Ok(Json(json!({ "ok": true, "user": user_value })))
+    Ok(Json(json!({ "ok": true, "user": user_value, "override": override_value })))
 }

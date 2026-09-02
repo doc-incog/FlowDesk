@@ -122,6 +122,16 @@ def transform(db) -> dict:
             # mentees: csv of names -> keep as raw for snapshot fidelity (no user ids)
             if table == "mentors" and isinstance(doc.get("mentees"), str):
                 doc["mentees"] = [s.strip() for s in doc["mentees"].split(",") if s.strip()]
+            # roles: the backend reads a `key` field (list_roles looks up by it),
+            # but the identity column `key` is promoted to `_id` above. Restore
+            # the `key` field so roles stay addressable by key after seeding.
+            if table == "roles" and "_id" in doc:
+                doc["key"] = doc["_id"]
+            # role_permissions: the backend consistently reads/writes a
+            # `role_key` field. The snapshot column is `role`; rename it here so
+            # role sections/defaults resolve in sync with the Rust routes.
+            if table == "role_permissions" and "role" in doc:
+                doc["role_key"] = doc.pop("role")
             # subjects: the snapshot stores these as a JSON-array string (e.g.
             # '["Data Structures","Operating Systems"]') but the backend User model
             # reads `subjects: Vec<String>`. Normalize to a real array here so the
