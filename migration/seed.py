@@ -122,6 +122,23 @@ def transform(db) -> dict:
             # mentees: csv of names -> keep as raw for snapshot fidelity (no user ids)
             if table == "mentors" and isinstance(doc.get("mentees"), str):
                 doc["mentees"] = [s.strip() for s in doc["mentees"].split(",") if s.strip()]
+            # subjects: the snapshot stores these as a JSON-array string (e.g.
+            # '["Data Structures","Operating Systems"]') but the backend User model
+            # reads `subjects: Vec<String>`. Normalize to a real array here so the
+            # stored BSON type matches and auth/find_one deserialization never fails.
+            if isinstance(doc.get("subjects"), str):
+                raw = doc["subjects"].strip()
+                parsed = None
+                if raw.startswith("["):
+                    try:
+                        cand = json.loads(raw)
+                        if isinstance(cand, list):
+                            parsed = [str(s).strip() for s in cand if str(s).strip()]
+                    except (ValueError, TypeError):
+                        parsed = None
+                if parsed is None:
+                    parsed = [s.strip() for s in raw.split(",") if s.strip()]
+                doc["subjects"] = parsed
             docs.append(doc)
         out.setdefault(coll, []).extend(docs)
     return out
