@@ -19,7 +19,7 @@ type HistoryRecord = {
   source: string
 }
 
-type PersonOption = { id: string; name: string; role: string; semester?: string | null }
+type PersonOption = { id: string; name: string; role: string; semester?: string | null; department?: string | null }
 
 type HistorySummary = {
   total: number
@@ -48,6 +48,11 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   // Date picker for daily log
   const [selectedDate, setSelectedDate] = useState(todayStr())
 
+  // The daily log is hidden by default for staff/admin: it only shows entries
+  // after the user searches a specific student or selects a date.
+  const [logActive, setLogActive] = useState(false)
+  const [logQuery, setLogQuery] = useState("")
+
   // History state
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([])
   const [historySummary, setHistorySummary] = useState<HistorySummary | null>(null)
@@ -68,6 +73,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [markError, setMarkError] = useState<string | null>(null)
   const [manFilterSemester, setManFilterSemester] = useState("")
+  const [manFilterClass, setManFilterClass] = useState("")
   const [manFilterName, setManFilterName] = useState("")
 
   // Fetch daily records when date changes
@@ -102,12 +108,13 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
             name: s.name,
             role: "student",
             semester: s.semester,
+            department: s.department,
           }))
         } else {
           const students = (d?.students ?? []) as UserProfile[]
           const staff = (d?.staff ?? []).map((s: UserProfile) => ({ id: s.id, name: s.name, role: s.role }))
           list = [
-            ...students.map((s) => ({ id: s.id, name: s.name, role: "student" as const, semester: s.semester })),
+            ...students.map((s) => ({ id: s.id, name: s.name, role: "student" as const, semester: s.semester, department: s.department })),
             ...staff,
           ]
         }
@@ -220,6 +227,19 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     ? people.filter((p) => p.name.toLowerCase().includes(personQuery.toLowerCase()))
     : people
 
+  // The daily log entries are hidden until the user chooses a date or searches.
+  const logShown = role === "student" || logActive
+  // Staff/admin summary counts only appear once the log has been revealed.
+  const statShown = role === "student" || logActive || Boolean(historySummary)
+  const dailyQuery = logQuery.trim().toLowerCase()
+  const dailyRecords = dailyQuery
+    ? records.filter(
+        (r) =>
+          r.name.toLowerCase().includes(dailyQuery) ||
+          (r.userId?.toLowerCase().includes(dailyQuery) ?? false),
+      )
+    : records
+
   // The manual-marking panel is only useful on today's view: map each mentee's
   // current status from today's check-ins (people without a row are unmarked).
   const isToday = selectedDate === todayStr()
@@ -232,14 +252,23 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
     }
   }
 
-  // Manual-marking filters: narrow the mentee list by semester and/or name so the
-  // staff member only sees the students they actually want to mark today.
+// Manual-marking filters: staff first pick a semester and/or class (department)
+// before any students are shown, then optionally narrow by name or ID within
+// that filtered set.
   const manSemesters = Array.from(
     new Set(people.map((p) => p.semester ?? "").filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const manClasses = Array.from(
+    new Set(people.map((p) => p.department ?? "").filter(Boolean)),
+  ).sort()
+  const manHasSelection = Boolean(manFilterSemester || manFilterClass)
   const manFiltered = people.filter((p) => {
     if (manFilterSemester && (p.semester ?? "") !== manFilterSemester) return false
-    if (manFilterName.trim() && !p.name.toLowerCase().includes(manFilterName.trim().toLowerCase())) return false
+    if (manFilterClass && (p.department ?? "") !== manFilterClass) return false
+    if (manFilterName.trim()) {
+      const q = manFilterName.trim().toLowerCase()
+      if (!p.name.toLowerCase().includes(q) && !p.id.toLowerCase().includes(q)) return false
+    }
     return true
   })
 
@@ -332,47 +361,47 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
         </div>
       )}
 
-      {/* Stats for staff/admin */}
-      {role !== "student" && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
-              <CheckCircle2 className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <p className="font-mono text-xl font-bold">{historySummary?.present ?? present}</p>
-              <p className="text-xs text-muted-foreground">Present</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
-              <Clock className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <p className="font-mono text-xl font-bold">{historySummary?.late ?? late}</p>
-              <p className="text-xs text-muted-foreground">Late</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
-              <Fingerprint className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <p className="font-mono text-xl font-bold">{historySummary?.absent ?? absent}</p>
-              <p className="text-xs text-muted-foreground">Absent</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
-              <Fingerprint className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <p className="font-mono text-xl font-bold">{historySummary?.percentage ?? percentage}%</p>
-              <p className="text-xs text-muted-foreground">Attendance</p>
-            </div>
-          </Card>
+{/* Stats for staff/admin */}
+  {role !== "student" && (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <Card className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
+          <CheckCircle2 className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <p className="font-mono text-xl font-bold">{statShown ? (historySummary?.present ?? present) : "—"}</p>
+          <p className="text-xs text-muted-foreground">Present</p>
         </div>
-      )}
+      </Card>
+      <Card className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
+          <Clock className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <p className="font-mono text-xl font-bold">{statShown ? (historySummary?.late ?? late) : "—"}</p>
+          <p className="text-xs text-muted-foreground">Late</p>
+        </div>
+      </Card>
+      <Card className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
+          <Fingerprint className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <p className="font-mono text-xl font-bold">{statShown ? (historySummary?.absent ?? absent) : "—"}</p>
+          <p className="text-xs text-muted-foreground">Absent</p>
+        </div>
+      </Card>
+      <Card className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-secondary text-muted-foreground">
+          <Fingerprint className="h-5 w-5" aria-hidden />
+        </span>
+        <div>
+          <p className="font-mono text-xl font-bold">{statShown ? (historySummary?.percentage ?? percentage) : "—"}</p>
+          <p className="text-xs text-muted-foreground">Attendance</p>
+        </div>
+      </Card>
+    </div>
+  )}
 
       {/* Manual attendance marking — staff, fallback when the fingerprint
           scanner is unavailable. */}
@@ -402,21 +431,36 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
                     ))}
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="man-filter-class" className="text-xs font-medium text-muted-foreground">Class / Program</label>
+                  <select
+                    id="man-filter-class"
+                    value={manFilterClass}
+                    onChange={(e) => setManFilterClass(e.target.value)}
+                    className={cn(inputCls, "min-w-40")}
+                  >
+                    <option value="">All classes</option>
+                    {manClasses.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="relative space-y-1.5">
-                  <label htmlFor="man-filter-name" className="text-xs font-medium text-muted-foreground">Student name</label>
+                  <label htmlFor="man-filter-name" className="text-xs font-medium text-muted-foreground">Student name / ID</label>
                   <input
                     id="man-filter-name"
                     type="search"
                     value={manFilterName}
                     onChange={(e) => setManFilterName(e.target.value)}
-                    placeholder="Search mentees…"
-                    className={cn(inputCls, "min-w-44")}
+                    disabled={!manHasSelection}
+                    placeholder={manHasSelection ? "Search name or ID…" : "Pick a semester/class first…"}
+                    className={cn(inputCls, "min-w-44", !manHasSelection && "cursor-not-allowed opacity-50")}
                   />
                 </div>
-                {(manFilterSemester || manFilterName.trim()) && (
+                {(manFilterSemester || manFilterClass || manFilterName.trim()) && (
                   <button
                     type="button"
-                    onClick={() => { setManFilterSemester(""); setManFilterName("") }}
+                    onClick={() => { setManFilterSemester(""); setManFilterClass(""); setManFilterName("") }}
                     className="rounded-sm border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Clear filters
@@ -424,11 +468,13 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {manFilterSemester || manFilterName.trim()
-                  ? `Showing ${manFiltered.length} of ${people.length} mentees.`
-                  : `${people.length} mentee${people.length === 1 ? "" : "s"} — filter by semester or name to mark attendance for a specific student.`}
+                {!manHasSelection
+                  ? `${people.length} mentee${people.length === 1 ? "" : "s"} — select a semester or class/program to see students and mark attendance.`
+                  : `Showing ${manFiltered.length} of ${people.length} mentees.`}
               </p>
-              {manFiltered.length === 0 ? (
+              {!manHasSelection ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Select a semester or class/program above to mark attendance.</p>
+              ) : manFiltered.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">No mentees match the selected filters.</p>
               ) : (
                 <ul className="divide-y divide-border">
@@ -489,7 +535,7 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
             id="checkin-date"
             type="date"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => { setSelectedDate(e.target.value); setLogActive(true) }}
             className={cn(inputCls, "font-mono")}
           />
         </div>
@@ -497,10 +543,25 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
 
       {/* Daily log table */}
       <Card>
-        <SectionHeading
-          title={role === "student" ? "Your check-in record" : "Today's check-in log"}
-          description={`${records.length} entr${records.length === 1 ? "y" : "ies"} · ${selectedDate}`}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionHeading
+            title={role === "student" ? "Your check-in record" : "Today's check-in log"}
+            description={role === "student" ? `${records.length} entr${records.length === 1 ? "y" : "ies"} · ${selectedDate}` : logShown ? `${dailyRecords.length} entr${dailyRecords.length === 1 ? "y" : "ies"} · ${selectedDate}` : "Hidden by default — choose a date or search a student."}
+          />
+          {role !== "student" && (
+            <div className="relative min-w-48">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                type="search"
+                value={logQuery}
+                onChange={(e) => { setLogQuery(e.target.value); if (e.target.value.trim()) setLogActive(true) }}
+                placeholder="Search student name or ID…"
+                aria-label="Search today's check-in log"
+                className={cn(inputCls, "w-full pl-9")}
+              />
+            </div>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead>
@@ -513,12 +574,18 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {records.length === 0 ? (
+              {!logShown ? (
+                <tr>
+                  <td colSpan={role !== "student" ? 5 : 4} className="py-2.5 text-center text-muted-foreground">
+                    The daily log is hidden by default. Choose a date or search a student to view entries.
+                  </td>
+                </tr>
+              ) : dailyRecords.length === 0 ? (
                 <tr>
                   <td colSpan={role !== "student" ? 5 : 4} className="py-2.5 text-center text-muted-foreground">No check-ins for this date yet.</td>
                 </tr>
               ) : (
-                records.map((r) => (
+                dailyRecords.map((r) => (
                   <tr key={r.id}>
                     <td className="py-2.5 font-medium">
                       {role !== "student" && r.userId ? (

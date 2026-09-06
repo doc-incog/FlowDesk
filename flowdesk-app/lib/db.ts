@@ -322,6 +322,48 @@ export function migrateDatabase(db: DatabaseSync) {
   } catch {
     // valid databases simply skip the rebuild
   }
+
+  // Exams: drop the fixed type CHECK so staff can schedule custom exam types
+  // (e.g. "Unit Test", "Quiz"). The type stays a free-text string afterwards.
+  try {
+    const examRow = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'exams'")
+      .get() as { sql: string } | undefined
+    if (examRow && /CHECK\s*\(\s*type\s+IN\s*\(/i.test(examRow.sql)) {
+      db.exec("PRAGMA foreign_keys = OFF")
+      db.exec("BEGIN")
+      try {
+        db.exec(`
+          CREATE TABLE exams_new (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            module_code TEXT NOT NULL,
+            module_name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            date TEXT NOT NULL,
+            start TEXT NOT NULL,
+            end TEXT NOT NULL,
+            room TEXT NOT NULL,
+            max_marks INTEGER NOT NULL
+          )
+        `)
+        db.exec(`
+          INSERT INTO exams_new (id, title, module_code, module_name, type, date, start, end, room, max_marks)
+          SELECT id, title, module_code, module_name, type, date, start, end, room, max_marks FROM exams
+        `)
+        db.exec("DROP TABLE exams")
+        db.exec("ALTER TABLE exams_new RENAME TO exams")
+        db.exec("COMMIT")
+      } catch (err) {
+        db.exec("ROLLBACK")
+        throw err
+      } finally {
+        db.exec("PRAGMA foreign_keys = ON")
+      }
+    }
+  } catch {
+    // valid databases simply skip the rebuild
+  }
 }
 
 /** Generates the next sequential id for a prefix inside a table (e.g. "MEN-"). */

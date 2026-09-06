@@ -236,7 +236,7 @@ export function DashboardShell() {
       case "chat":
         return <ChatSection role={user.role} />
       case "schedule":
-        return <ScheduleSection role={user.role} />
+        return <ScheduleSection role={user.role} userName={user.name} />
       case "exams":
         return <ExamsSection role={user.role} />
       case "assignments":
@@ -272,7 +272,8 @@ export function DashboardShell() {
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Dashboard sections">
         {navItems.map((item) => {
           const isActive = active === item.id
-          const label = item.id === "mentor" ? mentorLabel : item.label
+          const label =
+            item.id === "mentor" ? mentorLabel : item.id === "staff" && user.role === "staff" ? "Colleagues" : item.label
           return (
             <button
               key={item.id}

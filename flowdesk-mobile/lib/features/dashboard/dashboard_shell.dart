@@ -13,6 +13,7 @@ import '../../providers/roles_controller.dart';
 import '../chat/ai_chat.dart';
 import 'section.dart';
 import 'sections/admissions_section.dart';
+import 'sections/chat_section.dart';
 import 'sections/assignments_section.dart';
 import 'sections/check_in_section.dart';
 import 'sections/directory_section.dart';
@@ -42,13 +43,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
-    final unread = ref.watch(notificationsProvider).where((n) => n.unread).length;
-    final scheme = Theme.of(context).colorScheme;
-
     if (user == null) {
       return const SizedBox.shrink();
     }
 
+    final unread = ref.watch(notificationsProvider).where((n) => n.unread).length;
+    final scheme = Theme.of(context).colorScheme;
     final rolesData = ref.watch(rolesProvider);
     final sections = rolesData.effectiveSections(user.roleKeyValue, user.id);
     final navItems =
@@ -71,8 +71,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           _scaffoldKey.currentState?.closeDrawer();
         },
         onLogout: () {
+          _scaffoldKey.currentState?.closeDrawer();
           ref.read(authProvider.notifier).logout();
-          context.go('/');
+          if (mounted) context.go('/');
         },
       ),
       appBar: AppBar(
@@ -153,6 +154,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         return ExamsSection(role: role);
       case SectionId.assignments:
         return AssignmentsSection(role: role);
+      case SectionId.chat:
+        return const ChatSection();
       case SectionId.fees:
         return const FeesSection();
       case SectionId.scholarships:

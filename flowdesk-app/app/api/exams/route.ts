@@ -17,7 +17,7 @@ export async function GET() {
     title: string
     module_code: string
     module_name: string
-    type: "midterm" | "final" | "practical"
+    type: string
     date: string
     start: string
     end: string
@@ -108,9 +108,6 @@ export async function POST(request: Request) {
       { error: "Title, course code, course name, type, date, times and room are required" },
       { status: 400 },
     )
-  }
-  if (!["midterm", "final", "practical"].includes(type)) {
-    return NextResponse.json({ error: "Type must be midterm, final or practical" }, { status: 400 })
   }
 
   const maxMarksRaw = Number(body.maxMarks ?? 100)

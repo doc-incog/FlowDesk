@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Save, Lock } from "lucide-react"
+import { Save, Lock, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Avatar, Card, SectionHeading } from "@/components/dashboard/primitives"
+import { cn } from "@/lib/utils"
 
 function profileCompleteness(user: Record<string, unknown>): { pct: number; missing: string[] } {
   const fields: [string, string][] = [
@@ -52,6 +53,8 @@ export function ProfileSection() {
   const [error, setError] = useState<string | null>(null)
   const [pwCurrent, setPwCurrent] = useState("")
   const [pwNew, setPwNew] = useState("")
+  const [showPwCurrent, setShowPwCurrent] = useState(false)
+  const [showPwNew, setShowPwNew] = useState(false)
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<string | null>(null)
   const [pwError, setPwError] = useState<string | null>(null)
@@ -104,7 +107,11 @@ export function ProfileSection() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setPwError(data?.error ?? "Failed to change password")
+        setPwError(
+          res.status === 401
+            ? "Your session has expired. Please log in again."
+            : (data?.error ?? "Failed to change password"),
+        )
       } else {
         setPwMsg("Password changed successfully.")
         setPwCurrent("")
@@ -223,22 +230,46 @@ export function ProfileSection() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Current password">
-            <input
-              type="password"
-              className={inputCls}
-              value={pwCurrent}
-              onChange={(e) => setPwCurrent(e.target.value)}
-              placeholder="Enter current password"
-            />
+            <div className="relative">
+              <input
+                type={showPwCurrent ? "text" : "password"}
+                className={cn(inputCls, "pr-11")}
+                value={pwCurrent}
+                onChange={(e) => setPwCurrent(e.target.value)}
+                placeholder="Enter current password"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwCurrent((v) => !v)}
+                aria-label={showPwCurrent ? "Hide current password" : "Show current password"}
+                aria-pressed={showPwCurrent}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {showPwCurrent ? <EyeOff className="h-4.5 w-4.5" aria-hidden /> : <Eye className="h-4.5 w-4.5" aria-hidden />}
+              </button>
+            </div>
           </Field>
           <Field label="New password">
-            <input
-              type="password"
-              className={inputCls}
-              value={pwNew}
-              onChange={(e) => setPwNew(e.target.value)}
-              placeholder="At least 6 characters"
-            />
+            <div className="relative">
+              <input
+                type={showPwNew ? "text" : "password"}
+                className={cn(inputCls, "pr-11")}
+                value={pwNew}
+                onChange={(e) => setPwNew(e.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwNew((v) => !v)}
+                aria-label={showPwNew ? "Hide new password" : "Show new password"}
+                aria-pressed={showPwNew}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {showPwNew ? <EyeOff className="h-4.5 w-4.5" aria-hidden /> : <Eye className="h-4.5 w-4.5" aria-hidden />}
+              </button>
+            </div>
           </Field>
         </div>
         {pwError && <p role="alert" className="mt-3 text-sm text-destructive">{pwError}</p>}

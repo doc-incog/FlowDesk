@@ -33,7 +33,7 @@ function findConflicts(schedule: ScheduleSlot[]): Conflict[] {
   return conflicts
 }
 
-export function ScheduleSection({ role }: { role: Role }) {
+export function ScheduleSection({ role, userName }: { role: Role; userName: string }) {
   const [schedule, setSchedule] = useState<ScheduleSlot[]>([])
   const [staff, setStaff] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,7 +83,7 @@ export function ScheduleSection({ role }: { role: Role }) {
     role === "student"
       ? "Your weekly module routine."
       : role === "staff"
-        ? "Your teaching schedule for the week."
+        ? "The full weekly timetable for your programmes, with your own classes highlighted."
         : "Campus-wide module routine."
 
   const tabs: TabItem[] = [{ id: "routine", label: "Weekly routine" }]
@@ -119,6 +119,7 @@ export function ScheduleSection({ role }: { role: Role }) {
                       <SlotCard
                         key={s.id}
                         slot={s}
+                        isMine={role === "staff" && s.staff === userName}
                         onDelete={role === "admin" ? () => deleteSlot(s.id) : undefined}
                       />
                     ))
@@ -154,6 +155,7 @@ export function ScheduleSection({ role }: { role: Role }) {
                   <SlotCard
                     key={s.id}
                     slot={s}
+                    isMine={role === "staff" && s.staff === userName}
                     onDelete={role === "admin" ? () => deleteSlot(s.id) : undefined}
                   />
                 ))
@@ -170,40 +172,52 @@ export function ScheduleSection({ role }: { role: Role }) {
   )
 }
 
-function SlotCard({ slot, onDelete }: { slot: ScheduleSlot; onDelete?: () => void }) {
+function SlotCard({ slot, onDelete, isMine = false }: { slot: ScheduleSlot; onDelete?: () => void; isMine?: boolean }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   return (
-    <div className="rounded-xl border border-border bg-card/70 p-4">
+    <div
+      className={cn(
+        "rounded-xl border p-4",
+        isMine
+          ? "border-primary/50 bg-primary/[0.06] shadow-[0_0_0_1px_rgba(0,0,0,0.03)]"
+          : "border-border bg-card/70",
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="font-mono text-xs font-semibold text-muted-foreground">
           {slot.start} – {slot.end}
         </p>
-        {onDelete &&
-          (confirmingDelete ? (
-            <span className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
+          {isMine && (
+            <span className="pill bg-primary/10 text-primary">Your class</span>
+          )}
+          {onDelete &&
+            (confirmingDelete ? (
+              <span className="flex items-center gap-1">
+                <button
+                  onClick={onDelete}
+                  className="rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  No
+                </button>
+              </span>
+            ) : (
               <button
-                onClick={onDelete}
-                className="rounded-sm bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`Delete ${slot.module} slot`}
+                title="Delete slot"
+                className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
-                Delete
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
               </button>
-              <button
-                onClick={() => setConfirmingDelete(false)}
-                className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
-              >
-                No
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              aria-label={`Delete ${slot.module} slot`}
-              title="Delete slot"
-              className="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          ))}
+            ))}
+        </div>
       </div>
       <p className="mt-1 font-semibold leading-tight text-balance">{slot.module}</p>
       <p className="font-mono text-xs text-muted-foreground">{slot.code}</p>

@@ -170,7 +170,7 @@ export function createSchema(db: DatabaseSync) {
       title TEXT NOT NULL,
       module_code TEXT NOT NULL,
       module_name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('midterm','final','practical')),
+      type TEXT NOT NULL,
       date TEXT NOT NULL,
       start TEXT NOT NULL,
       end TEXT NOT NULL,

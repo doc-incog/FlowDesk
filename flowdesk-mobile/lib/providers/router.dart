@@ -11,12 +11,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     redirect: (context, state) {
       final user = ref.read(authProvider);
-      final isLogin = state.matchedLocation == '/';
-      final isApply = state.matchedLocation == '/apply';
+      final location = state.matchedLocation;
+      const publicRoutes = {'/', '/apply'};
+      final isPublic = publicRoutes.contains(location);
 
-      if (isLogin && user != null) return '/dashboard';
-      if (state.matchedLocation == '/dashboard' && user == null) return '/';
-      if (isApply && user != null) return null;
+      if (location == '/' && user != null) return '/dashboard';
+      if (!isPublic && user == null) return '/';
       return null;
     },
     routes: [

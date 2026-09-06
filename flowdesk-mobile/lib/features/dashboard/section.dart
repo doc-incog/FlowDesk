@@ -15,6 +15,7 @@ enum SectionId {
   fees('Online Fees', Icons.credit_card_outlined, {Role.student, Role.admin}, 'fees'),
   scholarships('Scholarships', Icons.emoji_events_outlined, {Role.student, Role.admin}, 'scholarships'),
   admissions('Admissions', Icons.fact_check_outlined, {Role.admin}, 'admissions'),
+  chat('Messages', Icons.message_outlined, {Role.student, Role.staff, Role.admin}, 'chat'),
   helpdesk('Helpdesk', Icons.support_agent_outlined, {Role.student, Role.staff, Role.admin}, 'helpdesk'),
   feedback('Feedback', Icons.rate_review_outlined, {Role.student, Role.staff, Role.admin}, 'feedback'),
   profile('Profile', Icons.badge_outlined, {Role.student, Role.staff, Role.admin}, 'profile'),
