@@ -190,38 +190,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   : const Text('Sign in'),
                             ),
                             const SizedBox(height: 18),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Demo credentials',
-                                      style: theme.textTheme.labelMedium
-                                          ?.copyWith(fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 8),
-                                  _CredentialLine(
-                                    label: 'Student',
-                                    value: mock.demoUsers[Role.student]!.email,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  _CredentialLine(
-                                    label: 'Staff',
-                                    value: mock.demoUsers[Role.staff]!.email,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  _CredentialLine(
-                                    label: 'Admin',
-                                    value:
-                                        '${mock.adminCreds.email} / ${mock.adminCreds.password}',
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
                             Text.rich(
                               textAlign: TextAlign.center,
                               TextSpan(
