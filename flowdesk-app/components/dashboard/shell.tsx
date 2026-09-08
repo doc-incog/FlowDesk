@@ -273,7 +273,15 @@ export function DashboardShell() {
         {navItems.map((item) => {
           const isActive = active === item.id
           const label =
-            item.id === "mentor" ? mentorLabel : item.id === "staff" && user.role === "staff" ? "Colleagues" : item.label
+            item.id === "mentor"
+              ? mentorLabel
+              : item.id === "staff"
+                ? user.role === "staff"
+                  ? "Colleagues"
+                  : user.role === "student"
+                    ? "Mentors"
+                    : item.label
+                : item.label
           return (
             <button
               key={item.id}
@@ -391,7 +399,7 @@ export function DashboardShell() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{u.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{u.role} · {u.department}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user.role === "student" && u.role === "staff" ? "Mentors" : u.role} · {u.department}</p>
                     </div>
                   </button>
                 ))}

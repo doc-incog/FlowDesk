@@ -323,7 +323,7 @@ function ComplaintCard({
         <p className="font-semibold">{complaint.subject}</p>
         <p className="text-sm text-muted-foreground">{complaint.description}</p>
         <p className="text-xs text-muted-foreground">
-          Raised by <span className="font-medium text-foreground">{complaint.raisedByName}</span> ({complaint.raisedByRole})
+          Raised by <span className="font-medium text-foreground">{complaint.raisedByName}</span> ({me.role === "student" && complaint.raisedByRole === "staff" ? "Mentors" : complaint.raisedByRole})
         </p>
       </div>
 

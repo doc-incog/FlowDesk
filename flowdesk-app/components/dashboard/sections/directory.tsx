@@ -172,13 +172,22 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
     }
   }
 
-  const title = kind === "students" ? "Student directory" : role === "staff" ? "Colleagues" : "Staff directory"
+  const title =
+    kind === "students"
+      ? "Student directory"
+      : role === "staff"
+        ? "Colleagues"
+        : role === "student"
+          ? "Mentor directory"
+          : "Staff directory"
   const desc = data
     ? kind === "students"
       ? `${data.length} students${role === "staff" ? " you teach or mentor" : " across the campus"}`
       : role === "staff"
         ? `${data.length} colleagues on campus`
-        : `${data.length} faculty and staff members`
+        : role === "student"
+          ? `${data.length} mentors across the campus`
+          : `${data.length} faculty and staff members`
     : ""
 
   if (loading) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>
@@ -317,7 +326,9 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
               </Card>
             )
           ) : filtered.length === 0 ? (
-            <Card className="py-10 text-center text-sm text-muted-foreground">No staff members found.</Card>
+            <Card className="py-10 text-center text-sm text-muted-foreground">
+              {role === "student" ? "No mentors found." : "No staff members found."}
+            </Card>
           ) : (
             filtered.map((p) => <PersonCard key={p.id} p={p} onSelect={select} />)
           )}
@@ -345,7 +356,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
                     <div>
                       <p className="text-lg font-bold">{selected.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {selected.roleLabel ?? selected.role} · {kind === "students" ? selected.semester : selected.designation}
+                        {(role === "student" && (selected.roleLabel ?? selected.role) === "staff" ? "Mentors" : (selected.roleLabel ?? selected.role))} · {kind === "students" ? selected.semester : selected.designation}
                       </p>
                     </div>
                   </div>
@@ -421,7 +432,7 @@ export function DirectorySection({ kind, role }: { kind: "students" | "staff"; r
           ) : (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-sm text-muted-foreground">
               <Search className="h-6 w-6" aria-hidden />
-              Select a {kind === "students" ? "student" : "staff member"} to view details.
+              Select a {kind === "students" ? "student" : role === "student" ? "mentor" : "staff member"} to view details.
             </div>
           )}
         </Card>

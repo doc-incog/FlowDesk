@@ -293,7 +293,7 @@ export function ChatSection({ role }: { role: string }) {
     <div className="space-y-6">
       <SectionHeading
         title="Messages"
-        description="Chat with students, staff, and administrators."
+        description={role === "student" ? "Chat with students, mentors, and administrators." : "Chat with students, staff, and administrators."}
         action={
           <button
             onClick={() => setShowNewChat(!showNewChat)}
@@ -332,7 +332,7 @@ export function ChatSection({ role }: { role: string }) {
                   <Avatar initials={u.avatarInitials} className="h-8 w-8 text-xs" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{u.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{u.roleLabel ?? u.role} · {u.department}</p>
+                    <p className="truncate text-xs text-muted-foreground">{role === "student" && (u.roleLabel ?? u.role) === "staff" ? "Mentors" : (u.roleLabel ?? u.role)} · {u.department}</p>
                   </div>
                 </button>
               ))}

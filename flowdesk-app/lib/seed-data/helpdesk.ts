@@ -59,7 +59,7 @@ export const COMPLAINTS: Complaint[] = [
     raisedByName: "Sara Lin",
     raisedByRole: "student",
     comments: [
-      { id: "cc2", author: "Library Staff", text: "Reserved section reorganized; holds now issued at the counter.", at: "07 Aug 2026" },
+      { id: "cc2", author: "Library Team", text: "Reserved section reorganized; holds now issued at the counter.", at: "07 Aug 2026" },
     ],
   },
   {

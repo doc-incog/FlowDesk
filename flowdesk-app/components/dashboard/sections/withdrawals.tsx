@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, DoorOpen, XCircle } from "lucide-react"
+import { CheckCircle2, DoorOpen, Trash2, XCircle } from "lucide-react"
 import type { Role } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { cn } from "@/lib/utils"
@@ -39,6 +39,7 @@ export function WithdrawalsSection({ role }: { role: Role }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submittedOk, setSubmittedOk] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const isStudent = role === "student"
 
   useEffect(() => {
@@ -94,6 +95,18 @@ export function WithdrawalsSection({ role }: { role: Role }) {
             w.id === id ? { ...w, status } : w,
           ),
         )
+      }
+    } catch {
+      // Refreshes on next visit
+    }
+  }
+
+  const deleteRequest = async (id: string) => {
+    setConfirmDeleteId(null)
+    try {
+      const res = await fetch(`/api/withdrawals/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setWithdrawals((prev) => prev.filter((w) => w.id !== id))
       }
     } catch {
       // Refreshes on next visit
@@ -177,6 +190,34 @@ export function WithdrawalsSection({ role }: { role: Role }) {
               <p className="text-sm text-muted-foreground">{w.reason}</p>
               {w.decisionNote && (
                 <p className="text-xs text-muted-foreground">Admin note: {w.decisionNote}</p>
+              )}
+              {isStudent && (w.status === "approved" || w.status === "rejected") && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {confirmDeleteId === w.id ? (
+                    <>
+                      <span className="text-sm text-muted-foreground">Delete this request? This can&apos;t be undone.</span>
+                      <button
+                        onClick={() => deleteRequest(w.id)}
+                        className="rounded-md bg-destructive px-3 py-1.5 text-sm font-semibold text-destructive-foreground transition-opacity hover:opacity-90"
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-secondary"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(w.id)}
+                      className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden /> Delete
+                    </button>
+                  )}
+                </div>
               )}
               {!isStudent && w.status === "pending" && (
                 <div className="flex shrink-0 items-center gap-2">

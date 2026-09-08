@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, Clock, Fingerprint, Search, Calendar } from "lucide-react"
+import { Calendar, CheckCircle2, Clock, Download, Fingerprint, Search } from "lucide-react"
 import type { CheckInRecord, Role, UserProfile } from "@/lib/seed-data/core"
 import { BiometricScanner } from "@/components/biometric-scanner"
 import { Card, RoleBadge, SectionHeading, StatusBadge } from "@/components/dashboard/primitives"
@@ -722,6 +722,20 @@ export function CheckInSection({ role, userName }: { role: Role; userName: strin
           >
             <Search className="h-4 w-4" aria-hidden /> {historyLoading ? "Searching…" : "Search"}
           </button>
+          {role === "student" && (
+            <a
+              href={`/api/checkins/history/pdf?from=${encodeURIComponent(historyFrom)}&to=${encodeURIComponent(historyTo)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={historyRecords.length === 0}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary",
+                historyRecords.length === 0 && "pointer-events-none opacity-40",
+              )}
+            >
+              <Download className="h-4 w-4" aria-hidden /> Download
+            </a>
+          )}
         </div>
 
         {/* History summary */}
