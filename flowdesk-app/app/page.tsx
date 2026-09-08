@@ -131,25 +131,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl bg-secondary/60 p-4">
-            <p className="text-xs font-semibold text-foreground">Demo credentials</p>
-            <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-              <li>
-                <span className="font-medium text-foreground">Student</span> — any student email, e.g.{" "}
-                <span className="font-mono">aisha.karim@campus.edu</span>
-              </li>
-              <li>
-                <span className="font-medium text-foreground">Staff</span> — any staff email, e.g.{" "}
-                <span className="font-mono">rahul.menon@campus.edu</span>
-              </li>
-              <li>
-                <span className="font-medium text-foreground">Admin</span> —{" "}
-                <span className="font-mono">admin@flowdesk.edu</span> /{" "}
-                <span className="font-mono">flowdesk-admin@2026</span>
-              </li>
-            </ul>
-          </div>
-
           <p className="mt-5 text-center text-sm text-muted-foreground">
             New to the campus?{" "}
             <Link href="/apply" className="font-semibold text-primary hover:underline">

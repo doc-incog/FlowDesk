@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { findUserById, getDb, mapUser } from "@/lib/db"
+import { hashPassword, verifyPassword } from "@/lib/db/password"
 import { withPermissions } from "@/lib/permissions"
-import { DEFAULT_PASSWORD } from "@/lib/constants"
-import { createHash } from "node:crypto"
 
 export const runtime = "nodejs"
 
@@ -103,14 +102,13 @@ export async function POST(request: Request) {
   const row = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(user.id) as { password_hash: string } | undefined
   if (!row) return NextResponse.json({ error: "User not found" }, { status: 404 })
 
-  // Verify current password (hashed with SHA-256)
-  const currentHash = createHash("sha256").update(currentPassword).digest("hex")
-  if (row.password_hash !== currentHash) {
+  // Verify the current password against the stored scrypt hash
+  // (passwords are hashed with hashPassword/verifyPassword, not plain SHA-256).
+  if (!verifyPassword(currentPassword, row.password_hash)) {
     return NextResponse.json({ error: "Current password is incorrect" }, { status: 403 })
   }
 
-  const newHash = createHash("sha256").update(newPassword).digest("hex")
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, user.id)
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(newPassword), user.id)
 
   return NextResponse.json({ success: true })
 }

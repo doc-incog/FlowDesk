@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Award, CheckCircle2, Clock, FileText, Plus, XCircle } from "lucide-react"
+import { Award, CheckCircle2, Clock, FileText, Plus, Trash2, XCircle } from "lucide-react"
 import type { Role, UserProfile } from "@/lib/seed-data/core"
 import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitives"
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
@@ -413,6 +413,7 @@ function AdminScholarships({
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState("")
   const [savingScholarship, setSavingScholarship] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: "",
     provider: "",
@@ -422,7 +423,14 @@ function AdminScholarships({
     deadline: "",
     description: "",
   })
-  const list = applications.filter((a) => filter === "all" || a.status === filter)
+  // The "under-review" tab acts as a combined review queue: applications that
+  // were just submitted and those already moved to under-review.
+  const list = applications.filter((a) =>
+    filter === "all" ||
+    (filter === "under-review"
+      ? a.status === "submitted" || a.status === "under-review"
+      : a.status === filter),
+  )
   const counts = {
     total: applications.length,
     approved: applications.filter((a) => a.status === "approved").length,
@@ -483,6 +491,27 @@ function AdminScholarships({
     }
   }
 
+  const deleteApplication = async (id: string) => {
+    setConfirmDeleteId(null)
+    try {
+      const res = await fetch(`/api/scholarships/applications/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setApplications((prev) => prev.filter((a) => a.id !== id))
+      }
+    } catch {
+      // Refreshes on next visit
+    }
+  }
+
+  const FILTER_LABELS: Record<string, string> = {
+    all: "All",
+    submitted: "Submitted",
+    "under-review": "Under review",
+    approved: "Approved",
+    rejected: "Rejected",
+    withdrawn: "Withdrawn",
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -514,7 +543,7 @@ function AdminScholarships({
               filter === f ? "bg-primary text-primary-foreground" : "border border-border bg-card hover:bg-secondary",
             )}
           >
-            {f}
+            {FILTER_LABELS[f] ?? f}
           </button>
         ))}
       </div>
@@ -540,20 +569,55 @@ function AdminScholarships({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  onClick={() => setStatus(a.id, "approved")}
-                  disabled={a.status === "approved" || a.status === "withdrawn"}
-                  className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                >
-                  <CheckCircle2 className="h-4 w-4" aria-hidden /> Approve
-                </button>
-                <button
-                  onClick={() => setStatus(a.id, "rejected")}
-                  disabled={a.status === "rejected" || a.status === "withdrawn"}
-                  className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
-                >
-                  <XCircle className="h-4 w-4" aria-hidden /> Reject
-                </button>
+                {confirmDeleteId === a.id ? (
+                  <>
+                    <span className="text-sm text-muted-foreground">Delete this application? This can&apos;t be undone.</span>
+                    <button
+                      onClick={() => deleteApplication(a.id)}
+                      className="rounded-md bg-destructive px-3 py-1.5 text-sm font-semibold text-destructive-foreground transition-opacity hover:opacity-90"
+                    >
+                      Yes, delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="rounded-md border border-border px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-secondary"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setStatus(a.id, "under-review")}
+                      disabled={a.status === "under-review" || a.status === "withdrawn"}
+                      className="flex items-center gap-1.5 rounded-sm border border-warning/40 px-3 py-1.5 text-sm font-semibold text-warning transition-colors hover:bg-warning/10 disabled:opacity-40"
+                    >
+                      <Clock className="h-4 w-4" aria-hidden /> Under review
+                    </button>
+                    <button
+                      onClick={() => setStatus(a.id, "approved")}
+                      disabled={a.status === "approved" || a.status === "withdrawn"}
+                      className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      <CheckCircle2 className="h-4 w-4" aria-hidden /> Approve
+                    </button>
+                    <button
+                      onClick={() => setStatus(a.id, "rejected")}
+                      disabled={a.status === "rejected" || a.status === "withdrawn"}
+                      className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-1.5 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                    >
+                      <XCircle className="h-4 w-4" aria-hidden /> Reject
+                    </button>
+                    {(a.status === "approved" || a.status === "rejected") && (
+                      <button
+                        onClick={() => setConfirmDeleteId(a.id)}
+                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden /> Delete
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </Card>
           )

@@ -71,6 +71,7 @@ export function AdmissionsSection() {
   const [programError, setProgramError] = useState<string | null>(null)
   const [addingProgram, setAddingProgram] = useState(false)
   const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [programForm, setProgramForm] = useState({
     name: "",
     duration: "4 years",
@@ -116,6 +117,18 @@ export function AdmissionsSection() {
     setApplications((prev) =>
       (prev ?? []).map((a) => (a.id === id ? { ...a, status, notes: note !== undefined ? note : a.notes } : a)),
     )
+
+  const deleteApplication = async (id: string) => {
+    setConfirmDeleteId(null)
+    try {
+      const res = await fetch(`/api/admissions/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setApplications((prev) => (prev ?? []).filter((a) => a.id !== id))
+      }
+    } catch {
+      // Refreshes on next visit
+    }
+  }
 
   const advance = (a: AdmissionApplication) => {
     const next = nextAdmissionStatus(a.status)
@@ -248,20 +261,48 @@ export function AdmissionsSection() {
                   className="flex-1 rounded-sm border border-input bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/30"
                 />
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={() => setStatus(a.id, "accepted", notes[a.id] ?? "Offer letter ready.")}
-                    disabled={a.status === "accepted"}
-                    className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-2 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    <CheckCircle2 className="h-4 w-4" aria-hidden /> Accept
-                  </button>
-                  <button
-                    onClick={() => setStatus(a.id, "rejected", notes[a.id] ?? a.notes)}
-                    disabled={a.status === "rejected"}
-                    className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
-                  >
-                    <XCircle className="h-4 w-4" aria-hidden /> Reject
-                  </button>
+                  {confirmDeleteId === a.id ? (
+                    <>
+                      <span className="text-sm text-muted-foreground">Delete this application? This can&apos;t be undone.</span>
+                      <button
+                        onClick={() => deleteApplication(a.id)}
+                        className="rounded-md bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground transition-opacity hover:opacity-90"
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded-md border border-border px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setStatus(a.id, "accepted", notes[a.id] ?? "Offer letter ready.")}
+                        disabled={a.status === "accepted"}
+                        className="flex items-center gap-1.5 rounded-lg bg-success px-3 py-2 text-sm font-semibold text-success-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                      >
+                        <CheckCircle2 className="h-4 w-4" aria-hidden /> Accept
+                      </button>
+                      <button
+                        onClick={() => setStatus(a.id, "rejected", notes[a.id] ?? a.notes)}
+                        disabled={a.status === "rejected"}
+                        className="flex items-center gap-1.5 rounded-sm border border-destructive/40 px-3 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                      >
+                        <XCircle className="h-4 w-4" aria-hidden /> Reject
+                      </button>
+                      {(a.status === "accepted" || a.status === "rejected") && (
+                        <button
+                          onClick={() => setConfirmDeleteId(a.id)}
+                          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden /> Delete
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </Card>

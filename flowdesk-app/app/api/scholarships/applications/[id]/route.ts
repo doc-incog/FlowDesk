@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { existsSync, unlinkSync } from "node:fs"
 import { getSessionUser } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 
@@ -54,4 +55,50 @@ export async function PATCH(
 
   db.prepare("UPDATE scholarship_applications SET status = 'withdrawn' WHERE id = ?").run(id)
   return NextResponse.json({ ok: true, status: "withdrawn" })
+}
+
+// DELETE /api/scholarships/applications/[id] — admin removes a decided
+// (approved or rejected) application, also removing any uploaded doc files.
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getSessionUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+  const { id } = await params
+
+  const db = getDb()
+  const row = db
+    .prepare("SELECT id, status, docs FROM scholarship_applications WHERE id = ?")
+    .get(id) as { id: string; status: string; docs: string } | undefined
+
+  if (!row) return NextResponse.json({ error: "Application not found" }, { status: 404 })
+  if (row.status !== "approved" && row.status !== "rejected") {
+    return NextResponse.json(
+      { error: "Only an approved or rejected application can be deleted" },
+      { status: 400 },
+    )
+  }
+
+  let docs: { path?: string | null }[] = []
+  try {
+    const parsed = JSON.parse(row.docs)
+    if (Array.isArray(parsed)) docs = parsed
+  } catch {
+    docs = []
+  }
+  for (const d of docs) {
+    if (d.path && existsSync(d.path)) {
+      try {
+        unlinkSync(d.path)
+      } catch {
+        // Best-effort: leave orphan file if it cannot be removed
+      }
+    }
+  }
+
+  db.prepare("DELETE FROM scholarship_applications WHERE id = ?").run(id)
+  return NextResponse.json({ ok: true })
 }

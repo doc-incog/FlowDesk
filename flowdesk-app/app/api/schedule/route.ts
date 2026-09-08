@@ -21,9 +21,9 @@ export async function GET() {
     staff: string
   }[]
 
-  // Students see the full class timetable; staff only their own classes.
-  const schedule =
-    user.role === "staff" ? rows.filter((s) => s.staff === user.name) : rows
+  // Everyone sees the full weekly timetable for their campus. Staff roles
+  // highlight their own classes on the client using the current user's name.
+  const schedule = rows
 
   return NextResponse.json({
     schedule: schedule.map((s) => ({

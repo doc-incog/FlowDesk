@@ -7,7 +7,7 @@ import { Card, SectionHeading, StatCard } from "@/components/dashboard/primitive
 import { SectionTabs, type TabItem } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
-type ExamType = "midterm" | "final" | "practical"
+type ExamType = string
 
 type Exam = {
   id: string
@@ -31,16 +31,18 @@ type ResultRow = {
   maxMarks: number
 }
 
-const TYPE_BADGE: Record<ExamType, string> = {
-  midterm: "pill bg-chart-1/10 text-chart-1",
-  final: "pill bg-chart-5/10 text-chart-5",
-  practical: "pill bg-chart-2/15 text-chart-2",
+function typeLabel(type: string): string {
+  return type === "midterm" ? "Mid-term" : type === "final" ? "Final" : type === "practical" ? "Practical" : type
 }
 
-const TYPE_LABEL: Record<ExamType, string> = {
-  midterm: "Mid-term",
-  final: "Final",
-  practical: "Practical",
+function typeBadge(type: string): string {
+  return type === "midterm"
+    ? "pill bg-chart-1/10 text-chart-1"
+    : type === "final"
+      ? "pill bg-chart-5/10 text-chart-5"
+      : type === "practical"
+        ? "pill bg-chart-2/15 text-chart-2"
+        : "pill bg-secondary text-muted-foreground"
 }
 
 function percentage(marks: number, max: number): number {
@@ -187,8 +189,8 @@ function ExamSchedule({ exams }: { exams: Exam[] }) {
               <p className="truncate font-semibold">{ex.moduleName}</p>
               <p className="font-mono text-xs text-muted-foreground">{ex.moduleCode}</p>
             </div>
-            <span className={cn("shrink-0", TYPE_BADGE[ex.type])}>
-              {TYPE_LABEL[ex.type]}
+            <span className={cn("shrink-0", typeBadge(ex.type))}>
+              {typeLabel(ex.type)}
             </span>
           </div>
           <p className="text-sm text-muted-foreground">{ex.title}</p>
@@ -682,6 +684,7 @@ function ManageExams({
     moduleCode: "",
     moduleName: "",
     type: "midterm" as ExamType,
+    customType: "",
     date: "",
     start: "09:00",
     end: "11:00",
@@ -696,6 +699,11 @@ function ManageExams({
       setError("Course code, course name, date and room are required.")
       return
     }
+    const effectiveType = form.type === "custom" ? form.customType.trim() : form.type
+    if (!effectiveType) {
+      setError("Enter a name for the custom exam type.")
+      return
+    }
     setSaving(true)
     setError("")
     try {
@@ -704,7 +712,8 @@ function ManageExams({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          title: `${TYPE_LABEL[form.type]} Examination`,
+          type: effectiveType,
+          title: `${typeLabel(effectiveType)} Examination`,
         }),
       })
       const d = await res.json()
@@ -713,7 +722,7 @@ function ManageExams({
         return
       }
       if (d?.exam) setExams((prev) => [...prev, d.exam])
-      setForm((f) => ({ ...f, moduleCode: "", moduleName: "", date: "", room: "" }))
+      setForm((f) => ({ ...f, moduleCode: "", moduleName: "", date: "", room: "", customType: "" }))
     } catch {
       setError("Network error while creating the exam.")
     } finally {
@@ -784,8 +793,21 @@ function ManageExams({
                 <option value="midterm">Mid-term</option>
                 <option value="final">Final</option>
                 <option value="practical">Practical</option>
+                <option value="custom">Custom…</option>
               </select>
             </div>
+            {form.type === "custom" && (
+              <div className="space-y-1.5 sm:col-span-3">
+                <label htmlFor="exam-custom-type" className="text-sm font-medium">Custom exam type</label>
+                <input
+                  id="exam-custom-type"
+                  value={form.customType}
+                  onChange={(e) => setForm((f) => ({ ...f, customType: e.target.value }))}
+                  placeholder="e.g. Unit Test, Quiz, Practical Viva…"
+                  className={inputCls}
+                />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

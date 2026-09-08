@@ -114,15 +114,15 @@ const scheduleDays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sun'];
 const defaultRolePermissions = <String, List<String>>{
   'student': [
     'overview', 'checkin', 'notifications', 'mentor', 'schedule', 'exams',
-    'assignments', 'fees', 'scholarships', 'helpdesk', 'feedback', 'profile',
+    'assignments', 'chat', 'fees', 'scholarships', 'helpdesk', 'feedback', 'profile',
   ],
   'staff': [
     'overview', 'checkin', 'notifications', 'students', 'mentor', 'schedule',
-    'exams', 'assignments', 'helpdesk', 'feedback', 'profile',
+    'exams', 'assignments', 'chat', 'helpdesk', 'feedback', 'profile',
   ],
   'admin': [
     'overview', 'checkin', 'notifications', 'students', 'staff', 'mentor',
-    'schedule', 'exams', 'assignments', 'fees', 'scholarships', 'admissions',
+    'schedule', 'exams', 'assignments', 'chat', 'fees', 'scholarships', 'admissions',
     'helpdesk', 'feedback', 'profile', 'roles',
   ],
 };
